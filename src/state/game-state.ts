@@ -7,6 +7,8 @@ export interface IGameState {
   activeRecipe: IRecipe | null;
   score: number;
   timeLeft: number;
+  endTime: number | null;
   lives: number;
   status: 'menu' | 'playing' | 'game-over';
+  gameOverReason: 'time' | 'lives' | 'ingredients' | null;
 }

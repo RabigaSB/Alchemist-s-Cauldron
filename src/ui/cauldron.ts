@@ -5,6 +5,7 @@ import { isBrewSuccessful } from '../logic/brew-check';
 import { MAX_CAULDRON_INGREDIENTS } from '../logic/add-ingredient';
 import { calculateCauldron } from '../logic/calculate-cauldron';
 import { createStock } from '../logic/stock';
+import { formatTime, getRemainingSeconds, hasIngredientsRemaining } from '../logic/timer';
 import type { IGameState } from '../state/game-state';
 import { createElement } from './create-element';
 import { createParameterBar } from './parameter-bar';
@@ -26,8 +27,10 @@ export function createCauldron(): HTMLElement {
     activeRecipe: null,
     score: 0,
     timeLeft: 0,
+    endTime: null,
     lives: 0,
     status: 'menu',
+    gameOverReason: null,
   };
 
   const title = createElement('h2', 'cauldron__title', "Alchemist's Cauldron");
@@ -42,14 +45,36 @@ export function createCauldron(): HTMLElement {
   startScreen.appendChild(startButton);
   cauldron.appendChild(startScreen);
 
+  const gameOverScreen = createElement('section', 'cauldron__game-over');
+  gameOverScreen.hidden = true;
+  gameOverScreen.setAttribute('aria-live', 'polite');
+  gameOverScreen.appendChild(createElement('h2', 'cauldron__game-over-title', 'Game Over'));
+  const gameOverReason = createElement('p', 'cauldron__game-over-reason');
+  gameOverScreen.appendChild(gameOverReason);
+  const finalScore = createElement('p', 'cauldron__final-score');
+  gameOverScreen.appendChild(finalScore);
+  const playAgainButton = createElement('button', 'cauldron__start', 'Play again');
+  playAgainButton.type = 'button';
+  playAgainButton.addEventListener('click', startGame);
+  gameOverScreen.appendChild(playAgainButton);
+  cauldron.appendChild(gameOverScreen);
+
   const game = createElement('div', 'cauldron__game');
   game.hidden = true;
 
   const scoreboard = createElement('div', 'cauldron__scoreboard');
   const scoreDisplay = createElement('span', 'cauldron__score');
-  const timeDisplay = createElement('span', 'cauldron__time');
+  const timeDisplay = createElement('output', 'cauldron__time');
+  timeDisplay.setAttribute('aria-live', 'off');
   const livesDisplay = createElement('span', 'cauldron__lives');
-  scoreboard.append(scoreDisplay, timeDisplay, livesDisplay);
+  const timer = createElement('div', 'cauldron__timer');
+  timer.setAttribute('role', 'progressbar');
+  timer.setAttribute('aria-label', 'Time remaining');
+  timer.setAttribute('aria-valuemin', '0');
+  timer.setAttribute('aria-valuemax', `${STARTING_TIME}`);
+  const timerFill = createElement('span', 'cauldron__timer-fill');
+  timer.appendChild(timerFill);
+  scoreboard.append(scoreDisplay, timeDisplay, livesDisplay, timer);
   game.appendChild(scoreboard);
 
   const recipePanel = createElement('section', 'cauldron__recipe-panel');
@@ -87,6 +112,7 @@ export function createCauldron(): HTMLElement {
   clearButton.addEventListener('click', () => {
     state.cauldronIngredients.length = 0;
     renderCauldron();
+    finishIfIngredientsExhausted();
   });
   actions.appendChild(clearButton);
   game.appendChild(actions);
@@ -97,21 +123,36 @@ export function createCauldron(): HTMLElement {
 
   cauldron.appendChild(game);
 
+  let timerInterval: ReturnType<typeof setInterval> | undefined;
+
   function startGame(): void {
+    if (timerInterval !== undefined) {
+      clearInterval(timerInterval);
+    }
+
     state.cauldronIngredients = [];
     state.shelfStock = createStock(shelfIngredients);
     state.activeRecipe = pickRandomRecipe(GAME_DIFFICULTY);
     state.score = 0;
     state.timeLeft = STARTING_TIME;
+    state.endTime = Date.now() + STARTING_TIME * 1000;
     state.lives = STARTING_LIVES;
     state.status = 'playing';
+    state.gameOverReason = null;
     resultMessage.textContent = '';
     startScreen.hidden = true;
+    gameOverScreen.hidden = true;
     game.hidden = false;
     renderCauldron();
+    updateTimer();
+    timerInterval = setInterval(updateTimer, 250);
   }
 
   function brew(): void {
+    if (!updateTimer()) {
+      return;
+    }
+
     if (
       state.status !== 'playing' ||
       state.activeRecipe === null ||
@@ -126,7 +167,12 @@ export function createCauldron(): HTMLElement {
 
     if (successful) {
       state.score += SCORE_PER_BREW;
-      state.timeLeft = Math.min(MAX_TIME, state.timeLeft + TIME_BONUS_PER_BREW);
+      const now = Date.now();
+      state.endTime = Math.min(
+        (state.endTime ?? now) + TIME_BONUS_PER_BREW * 1000,
+        now + MAX_TIME * 1000,
+      );
+      state.timeLeft = getRemainingSeconds(state.endTime, now);
       state.activeRecipe = pickRandomRecipe(GAME_DIFFICULTY);
       resultMessage.textContent = 'Success! The potion is brewed.';
     } else {
@@ -137,17 +183,69 @@ export function createCauldron(): HTMLElement {
     renderCauldron();
 
     if (state.lives === 0) {
-      state.status = 'game-over';
-      startMessage.textContent = `Game over! Final score: ${state.score}`;
-      startButton.textContent = 'Play Again';
-      startScreen.hidden = false;
-      game.hidden = true;
+      endGame('lives');
+      return;
     }
+
+    finishIfIngredientsExhausted();
+  }
+
+  function updateTimer(): boolean {
+    if (state.status !== 'playing' || state.endTime === null) {
+      return false;
+    }
+
+    state.timeLeft = getRemainingSeconds(state.endTime);
+    updateTimerDisplay();
+
+    if (state.timeLeft === 0) {
+      endGame('time');
+      return false;
+    }
+
+    return true;
+  }
+
+  function updateTimerDisplay(): void {
+    timeDisplay.value = formatTime(state.timeLeft);
+    timerFill.style.width = `${(state.timeLeft / STARTING_TIME) * 100}%`;
+    timer.setAttribute('aria-valuenow', `${state.timeLeft}`);
+    timer.classList.toggle('cauldron__timer--urgent', state.timeLeft < 15);
+    timeDisplay.classList.toggle('cauldron__time--urgent', state.timeLeft < 15);
+  }
+
+  function finishIfIngredientsExhausted(): void {
+    if (
+      state.status === 'playing' &&
+      state.cauldronIngredients.length === 0 &&
+      !hasIngredientsRemaining(state.shelfStock)
+    ) {
+      endGame('ingredients');
+    }
+  }
+
+  function endGame(reason: NonNullable<IGameState['gameOverReason']>): void {
+    if (state.status !== 'playing') {
+      return;
+    }
+
+    state.status = 'game-over';
+    state.gameOverReason = reason;
+    if (timerInterval !== undefined) {
+      clearInterval(timerInterval);
+      timerInterval = undefined;
+    }
+    gameOverReason.textContent = getGameOverMessage(reason);
+    finalScore.textContent = `Final score: ${state.score}`;
+    game.hidden = true;
+    startScreen.hidden = true;
+    gameOverScreen.hidden = false;
   }
 
   function renderCauldron(): void {
     const recipe = state.activeRecipe;
     const values = calculateCauldron(state.cauldronIngredients);
+    updateTimerDisplay();
 
     if (recipe) {
       recipeTitle.textContent = recipe.name;
@@ -162,7 +260,6 @@ export function createCauldron(): HTMLElement {
     }
 
     scoreDisplay.textContent = `Score: ${state.score}`;
-    timeDisplay.textContent = `Time: ${state.timeLeft}s`;
     livesDisplay.textContent = `Lives: ${state.lives}`;
     ingredientsTitle.textContent = `Ingredients: ${state.cauldronIngredients.length} / ${MAX_CAULDRON_INGREDIENTS}`;
     ingredientsTitle.classList.toggle(
@@ -180,6 +277,20 @@ export function createCauldron(): HTMLElement {
   }
 
   return cauldron;
+}
+
+function getGameOverMessage(reason: NonNullable<IGameState['gameOverReason']>): string {
+  switch (reason) {
+    case 'time': {
+      return 'Time is up.';
+    }
+    case 'lives': {
+      return 'You ran out of lives.';
+    }
+    case 'ingredients': {
+      return 'Out of ingredients.';
+    }
+  }
 }
 
 function createRangeLabel(label: string, range: IRecipeRange): HTMLElement {
