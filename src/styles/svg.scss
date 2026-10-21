@@ -1,0 +1,100 @@
+@use './variables.scss' as *;
+
+.svg {
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  position: relative;
+  display: block;
+  background: radial-gradient(circle at 50% 50%, $gothic-green-glow, transparent 70%);
+  border-radius: 50%;
+  box-shadow:
+    0 0 10px $dark-wood,
+    0 0 20px $gothic-green-glow,
+    0 0 30px $gothic-green-glow,
+    0 0 40px $gothic-green-glow;
+  animation: bubble-float 3s ease-in-out infinite;
+
+  &__animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  &__container {
+    position: relative;
+    max-width: 320px;
+    max-height: 320px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  &__bubble {
+    position: absolute;
+    overflow: hidden;
+    width: 160px;
+    height: 130px;
+    z-index: 20;
+    top: 50px;
+    pointer-events: none;
+
+    &-elem1,
+    &-elem2,
+    &-elem3,
+    &-elem4 {
+      position: absolute;
+      background: radial-gradient(circle, rgba(160, 255, 140, 0.9) 0%, rgba(57, 255, 20, 0.2) 70%);
+      border-radius: 50%;
+      animation: bubble 3s infinite ease-in;
+    }
+
+    &-elem1 {
+      animation-delay: 0s;
+      width: 16px;
+      height: 16px;
+      left: 24px;
+      bottom: 0;
+    }
+    &-elem2 {
+      animation-delay: 0.8s;
+      width: 12px;
+      height: 12px;
+      left: 64px;
+      bottom: 0;
+    }
+    &-elem3 {
+      animation-delay: 1.5s;
+      width: 20px;
+      height: 20px;
+      left: 100px;
+      bottom: 0;
+    }
+    &-elem4 {
+      animation-delay: 2.2s;
+      width: 14px;
+      height: 14px;
+      left: 80px;
+      bottom: 0;
+    }
+  }
+}
+
+@keyframes bubble {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-120px) scale(0.5);
+    opacity: 0;
+  }
+}
+
+@keyframes bubble-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}

@@ -1,0 +1,21 @@
+@use './variables.scss' as *;
+
+.icon-pseudo {
+  display: inline-block;
+  width: $icon-width;
+  height: $icon-height;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  content: '';
+}
+
+.icon-mask-pseudo {
+  display: inline-block;
+  width: $icon-width;
+  height: $icon-height;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  content: '';
+}
