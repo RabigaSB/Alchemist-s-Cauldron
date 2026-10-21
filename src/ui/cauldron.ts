@@ -6,6 +6,15 @@ import { MAX_CAULDRON_INGREDIENTS } from '../logic/add-ingredient';
 import { calculateCauldron } from '../logic/calculate-cauldron';
 import { createStock } from '../logic/stock';
 import { formatTime, getRemainingSeconds, hasIngredientsRemaining } from '../logic/timer';
+import {
+  addLeaderboardEntry,
+  clearLeaderboard,
+  formatLeaderboardDate,
+  isValidPlayerName,
+  qualifiesForLeaderboard,
+  readLeaderboard,
+} from '../storage/leaderboard';
+import type { ILeaderboardEntry } from '../storage/leaderboard';
 import type { IGameState } from '../state/game-state';
 import { createElement } from './create-element';
 import { createParameterBar } from './parameter-bar';
@@ -43,6 +52,10 @@ export function createCauldron(): HTMLElement {
   startButton.type = 'button';
   startButton.addEventListener('click', startGame);
   startScreen.appendChild(startButton);
+  const startLeaderboardButton = createElement('button', 'cauldron__menu-button', 'Leaderboard');
+  startLeaderboardButton.type = 'button';
+  startLeaderboardButton.addEventListener('click', openLeaderboard);
+  startScreen.appendChild(startLeaderboardButton);
   cauldron.appendChild(startScreen);
 
   const gameOverScreen = createElement('section', 'cauldron__game-over');
@@ -53,11 +66,96 @@ export function createCauldron(): HTMLElement {
   gameOverScreen.appendChild(gameOverReason);
   const finalScore = createElement('p', 'cauldron__final-score');
   gameOverScreen.appendChild(finalScore);
+  const nameForm = createElement('form', 'cauldron__name-form');
+  nameForm.hidden = true;
+  const nameLabel = createElement(
+    'label',
+    'cauldron__name-label',
+    'Enter your name for the Top 10:',
+  );
+  const nameInput = createElement('input', 'cauldron__name-input');
+  nameInput.name = 'playerName';
+  nameInput.required = true;
+  nameInput.minLength = 2;
+  nameInput.maxLength = 15;
+  nameInput.pattern = '(?:[A-Za-z0-9 _]|-){2,15}';
+  nameLabel.appendChild(nameInput);
+  nameForm.appendChild(nameLabel);
+  const nameError = createElement('p', 'cauldron__name-error');
+  nameError.setAttribute('aria-live', 'polite');
+  nameForm.appendChild(nameError);
+  const saveScoreButton = createElement('button', 'cauldron__menu-button', 'Save Score');
+  saveScoreButton.type = 'submit';
+  nameForm.appendChild(saveScoreButton);
+  nameForm.addEventListener('submit', saveScore);
+  gameOverScreen.appendChild(nameForm);
+  const scoreSaveStatus = createElement('p', 'cauldron__score-save-status');
+  scoreSaveStatus.setAttribute('aria-live', 'polite');
+  gameOverScreen.appendChild(scoreSaveStatus);
+  const gameOverLeaderboardButton = createElement('button', 'cauldron__menu-button', 'Leaderboard');
+  gameOverLeaderboardButton.type = 'button';
+  gameOverLeaderboardButton.addEventListener('click', openLeaderboard);
+  gameOverScreen.appendChild(gameOverLeaderboardButton);
   const playAgainButton = createElement('button', 'cauldron__start', 'Play again');
   playAgainButton.type = 'button';
   playAgainButton.addEventListener('click', startGame);
   gameOverScreen.appendChild(playAgainButton);
   cauldron.appendChild(gameOverScreen);
+
+  const leaderboardDialog = createElement('section', 'cauldron__leaderboard-dialog');
+  leaderboardDialog.hidden = true;
+  leaderboardDialog.setAttribute('role', 'dialog');
+  leaderboardDialog.setAttribute('aria-modal', 'true');
+  leaderboardDialog.setAttribute('aria-labelledby', 'leaderboard-title');
+  const leaderboardContent = createElement('div', 'cauldron__leaderboard-content');
+  const leaderboardTitle = createElement('h2', 'cauldron__leaderboard-title', 'Top 10 Players');
+  leaderboardTitle.id = 'leaderboard-title';
+  leaderboardContent.appendChild(leaderboardTitle);
+  const leaderboardStatus = createElement('p', 'cauldron__leaderboard-status');
+  leaderboardStatus.setAttribute('aria-live', 'polite');
+  leaderboardContent.appendChild(leaderboardStatus);
+  const leaderboardTable = createElement('table', 'cauldron__leaderboard-table');
+  leaderboardContent.appendChild(leaderboardTable);
+  const leaderboardActions = createElement('div', 'cauldron__leaderboard-actions');
+  const clearLeaderboardButton = createElement(
+    'button',
+    'cauldron__menu-button',
+    'Clear Leaderboard',
+  );
+  clearLeaderboardButton.type = 'button';
+  clearLeaderboardButton.addEventListener('click', showClearConfirmation);
+  leaderboardActions.appendChild(clearLeaderboardButton);
+  const closeLeaderboardButton = createElement('button', 'cauldron__menu-button', 'Close');
+  closeLeaderboardButton.type = 'button';
+  closeLeaderboardButton.addEventListener('click', closeLeaderboard);
+  leaderboardActions.appendChild(closeLeaderboardButton);
+  leaderboardContent.appendChild(leaderboardActions);
+  leaderboardDialog.appendChild(leaderboardContent);
+
+  const clearConfirmation = createElement('section', 'cauldron__clear-confirmation');
+  clearConfirmation.hidden = true;
+  clearConfirmation.setAttribute('aria-labelledby', 'clear-confirmation-title');
+  clearConfirmation.appendChild(
+    createElement('h2', 'cauldron__leaderboard-title', 'Clear Leaderboard?'),
+  ).id = 'clear-confirmation-title';
+  const clearConfirmationStatus = createElement(
+    'p',
+    'cauldron__leaderboard-status',
+    'This will permanently remove all saved scores.',
+  );
+  clearConfirmation.appendChild(clearConfirmationStatus);
+  const confirmationActions = createElement('div', 'cauldron__leaderboard-actions');
+  const confirmClearButton = createElement('button', 'cauldron__menu-button', 'Confirm Clear');
+  confirmClearButton.type = 'button';
+  confirmClearButton.addEventListener('click', confirmClearLeaderboard);
+  confirmationActions.appendChild(confirmClearButton);
+  const cancelClearButton = createElement('button', 'cauldron__menu-button', 'Cancel');
+  cancelClearButton.type = 'button';
+  cancelClearButton.addEventListener('click', hideClearConfirmation);
+  confirmationActions.appendChild(cancelClearButton);
+  clearConfirmation.appendChild(confirmationActions);
+  leaderboardDialog.appendChild(clearConfirmation);
+  cauldron.appendChild(leaderboardDialog);
 
   const pauseDialog = createElement('section', 'cauldron__pause-dialog');
   pauseDialog.hidden = true;
@@ -148,6 +246,7 @@ export function createCauldron(): HTMLElement {
 
   let timerInterval: ReturnType<typeof setInterval> | undefined;
   let pausedTimeMs = 0;
+  let leaderboardReturnFocus: HTMLElement | null = null;
 
   document.addEventListener('visibilitychange', handleVisibilityChange);
 
@@ -167,6 +266,10 @@ export function createCauldron(): HTMLElement {
     state.status = 'playing';
     state.gameOverReason = null;
     resultMessage.textContent = '';
+    nameForm.hidden = true;
+    nameInput.value = '';
+    nameError.textContent = '';
+    scoreSaveStatus.textContent = '';
     startScreen.hidden = true;
     gameOverScreen.hidden = true;
     pauseDialog.hidden = true;
@@ -336,9 +439,108 @@ export function createCauldron(): HTMLElement {
     }
     gameOverReason.textContent = getGameOverMessage(reason);
     finalScore.textContent = `Final score: ${state.score}`;
+    nameError.textContent = '';
+    nameInput.value = '';
+    scoreSaveStatus.textContent = '';
+    const leaderboard = readLeaderboard();
+    if (leaderboard.success && qualifiesForLeaderboard(state.score, leaderboard.entries)) {
+      nameForm.hidden = false;
+    } else {
+      nameForm.hidden = true;
+      if (!leaderboard.success) {
+        scoreSaveStatus.textContent = leaderboard.error;
+      }
+    }
     game.hidden = true;
     startScreen.hidden = true;
     gameOverScreen.hidden = false;
+    if (!nameForm.hidden) {
+      nameInput.focus();
+    }
+  }
+
+  function saveScore(event: SubmitEvent): void {
+    event.preventDefault();
+    const name = nameInput.value;
+
+    if (!isValidPlayerName(name)) {
+      nameError.textContent = 'Use 2–15 letters, digits, spaces, underscores, or hyphens.';
+      nameInput.focus();
+      return;
+    }
+
+    const result = addLeaderboardEntry(name, state.score);
+    if (!result.success) {
+      nameError.textContent = result.error;
+      return;
+    }
+
+    nameForm.hidden = true;
+    scoreSaveStatus.textContent = 'Your score has been saved.';
+  }
+
+  function openLeaderboard(event?: Event): void {
+    leaderboardReturnFocus =
+      event?.currentTarget instanceof HTMLElement ? event.currentTarget : startLeaderboardButton;
+    renderLeaderboard();
+    leaderboardContent.hidden = false;
+    clearConfirmation.hidden = true;
+    leaderboardDialog.hidden = false;
+    closeLeaderboardButton.focus();
+  }
+
+  function closeLeaderboard(): void {
+    leaderboardDialog.hidden = true;
+    leaderboardReturnFocus?.focus();
+  }
+
+  function renderLeaderboard(): void {
+    const result = readLeaderboard();
+    leaderboardStatus.textContent = result.success ? '' : result.error;
+    leaderboardTable.replaceChildren();
+
+    if (!result.success) {
+      return;
+    }
+
+    leaderboardTable.appendChild(createLeaderboardHeader());
+    const body = createElement('tbody');
+    result.entries.forEach((entry, index) =>
+      body.appendChild(createLeaderboardRow(entry, index + 1)),
+    );
+    if (result.entries.length === 0) {
+      const emptyRow = createElement('tr');
+      const emptyCell = createElement('td');
+      emptyCell.textContent = 'No scores yet.';
+      emptyCell.colSpan = 4;
+      emptyRow.appendChild(emptyCell);
+      body.appendChild(emptyRow);
+    }
+    leaderboardTable.appendChild(body);
+  }
+
+  function showClearConfirmation(): void {
+    clearConfirmationStatus.textContent = 'This will permanently remove all saved scores.';
+    leaderboardContent.hidden = true;
+    clearConfirmation.hidden = false;
+    cancelClearButton.focus();
+  }
+
+  function hideClearConfirmation(): void {
+    clearConfirmation.hidden = true;
+    leaderboardContent.hidden = false;
+    clearLeaderboardButton.focus();
+  }
+
+  function confirmClearLeaderboard(): void {
+    const result = clearLeaderboard();
+    if (result.success) {
+      hideClearConfirmation();
+      renderLeaderboard();
+      leaderboardStatus.textContent = 'Leaderboard cleared.';
+    } else {
+      clearConfirmationStatus.textContent = result.error;
+    }
   }
 
   function renderCauldron(): void {
@@ -395,4 +597,32 @@ function getGameOverMessage(reason: NonNullable<IGameState['gameOverReason']>): 
 
 function createRangeLabel(label: string, range: IRecipeRange): HTMLElement {
   return createElement('p', 'cauldron__recipe-range', `${label}: ${range.min}..${range.max}`);
+}
+
+function createLeaderboardHeader(): HTMLTableSectionElement {
+  const header = createElement('thead');
+  const row = createElement('tr');
+
+  ['Rank', 'Name', 'Score', 'Date'].forEach((label) => {
+    const cell = createElement('th');
+    cell.scope = 'col';
+    cell.textContent = label;
+    row.appendChild(cell);
+  });
+
+  header.appendChild(row);
+  return header;
+}
+
+function createLeaderboardRow(entry: ILeaderboardEntry, rank: number): HTMLTableRowElement {
+  const row = createElement('tr');
+  const values = [`${rank}`, entry.name, `${entry.score}`, formatLeaderboardDate(entry.timestamp)];
+
+  values.forEach((value) => {
+    const cell = createElement('td');
+    cell.textContent = value;
+    row.appendChild(cell);
+  });
+
+  return row;
 }
