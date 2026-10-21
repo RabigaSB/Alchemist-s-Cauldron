@@ -1,8 +1,8 @@
-import type { IRecipeRange } from '../data/recipe-target';
+import type { IRecipeRange } from '../data/recipes';
 
 export interface IParameterBar {
   element: HTMLElement;
-  update: (value: number) => void;
+  update: (value: number, target: IRecipeRange) => void;
 }
 
 export function createParameterBar(
@@ -40,8 +40,6 @@ export function createParameterBar(
   const targetZone = document.createElement('span');
   targetZone.className = 'parameter-bar__target';
   targetZone.setAttribute('aria-hidden', 'true');
-  targetZone.style.left = `${toPercent(target.min, minimum, maximum)}%`;
-  targetZone.style.width = `${toPercent(target.max - target.min, 0, maximum - minimum)}%`;
   track.appendChild(targetZone);
 
   if (minimum < 0 && maximum > 0) {
@@ -59,20 +57,26 @@ export function createParameterBar(
 
   const rangeLabel = document.createElement('p');
   rangeLabel.className = 'parameter-bar__range';
-  rangeLabel.textContent = `Target: ${target.min} to ${target.max}`;
   bar.appendChild(rangeLabel);
 
-  function update(value: number): void {
+  function update(value: number, currentTarget: IRecipeRange): void {
     const clampedValue = Math.min(maximum, Math.max(minimum, value));
-    const isInTarget = value >= target.min && value <= target.max;
+    const isInTarget = value >= currentTarget.min && value <= currentTarget.max;
 
     valueLabel.value = `${value}`;
+    targetZone.style.left = `${toPercent(currentTarget.min, minimum, maximum)}%`;
+    targetZone.style.width = `${toPercent(currentTarget.max - currentTarget.min, 0, maximum - minimum)}%`;
     track.setAttribute('aria-valuenow', `${value}`);
+    track.setAttribute(
+      'aria-label',
+      `${label}; target ${currentTarget.min} to ${currentTarget.max}`,
+    );
     valueMarker.style.left = `${toPercent(clampedValue, minimum, maximum)}%`;
     bar.classList.toggle('parameter-bar--in-range', isInTarget);
+    rangeLabel.textContent = `Target: ${currentTarget.min} to ${currentTarget.max}`;
   }
 
-  update(0);
+  update(0, target);
 
   return { element: bar, update };
 }

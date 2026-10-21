@@ -26,10 +26,7 @@ export function createShelf(state: IGameState, onIngredientAdded: () => void): I
   function render(): void {
     ingredientsContainer.replaceChildren(
       ...SHELF_INGREDIENTS.map((ingredient) =>
-        createIngredientCard(ingredient, state, () => {
-          onIngredientAdded();
-          render();
-        }),
+        createIngredientCard(ingredient, state, onIngredientAdded),
       ),
     );
   }
