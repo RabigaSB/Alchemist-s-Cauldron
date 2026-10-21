@@ -1,4 +1,5 @@
 @use './variables.scss' as *;
+@use './mixin.scss' as *;
 
 .svg {
   width: 100%;
@@ -20,12 +21,15 @@
   }
 
   &__container {
-    position: relative;
-    max-width: 320px;
-    max-height: 320px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    display: none;
+    @include desktop {
+      position: relative;
+      max-width: 320px;
+      max-height: 320px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
   }
 
   &__bubble {
