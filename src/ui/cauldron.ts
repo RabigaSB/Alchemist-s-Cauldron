@@ -59,6 +59,24 @@ export function createCauldron(): HTMLElement {
   gameOverScreen.appendChild(playAgainButton);
   cauldron.appendChild(gameOverScreen);
 
+  const pauseDialog = createElement('section', 'cauldron__pause-dialog');
+  pauseDialog.hidden = true;
+  pauseDialog.setAttribute('role', 'dialog');
+  pauseDialog.setAttribute('aria-modal', 'true');
+  pauseDialog.setAttribute('aria-labelledby', 'pause-title');
+  const pauseTitle = createElement('h2', 'cauldron__pause-title', 'Game paused');
+  pauseTitle.id = 'pause-title';
+  pauseDialog.appendChild(pauseTitle);
+  const resumeButton = createElement('button', 'cauldron__pause-action', 'Resume');
+  resumeButton.type = 'button';
+  resumeButton.addEventListener('click', resumeGame);
+  pauseDialog.appendChild(resumeButton);
+  const exitButton = createElement('button', 'cauldron__pause-action', 'Exit to Menu');
+  exitButton.type = 'button';
+  exitButton.addEventListener('click', exitToMenu);
+  pauseDialog.appendChild(exitButton);
+  cauldron.appendChild(pauseDialog);
+
   const game = createElement('div', 'cauldron__game');
   game.hidden = true;
 
@@ -100,6 +118,11 @@ export function createCauldron(): HTMLElement {
   game.appendChild(ingredientsList);
 
   const actions = createElement('div', 'cauldron__actions');
+  const pauseButton = createElement('button', 'cauldron__pause', 'Pause');
+  pauseButton.type = 'button';
+  pauseButton.addEventListener('click', pauseGame);
+  actions.appendChild(pauseButton);
+
   const brewButton = createElement('button', 'cauldron__brew', 'Brew');
   brewButton.type = 'button';
   brewButton.disabled = true;
@@ -124,6 +147,9 @@ export function createCauldron(): HTMLElement {
   cauldron.appendChild(game);
 
   let timerInterval: ReturnType<typeof setInterval> | undefined;
+  let pausedTimeMs = 0;
+
+  document.addEventListener('visibilitychange', handleVisibilityChange);
 
   function startGame(): void {
     if (timerInterval !== undefined) {
@@ -136,16 +162,89 @@ export function createCauldron(): HTMLElement {
     state.score = 0;
     state.timeLeft = STARTING_TIME;
     state.endTime = Date.now() + STARTING_TIME * 1000;
+    pausedTimeMs = 0;
     state.lives = STARTING_LIVES;
     state.status = 'playing';
     state.gameOverReason = null;
     resultMessage.textContent = '';
     startScreen.hidden = true;
     gameOverScreen.hidden = true;
+    pauseDialog.hidden = true;
     game.hidden = false;
     renderCauldron();
     updateTimer();
     timerInterval = setInterval(updateTimer, 250);
+  }
+
+  function pauseGame(): void {
+    if (!updateTimer() || state.status !== 'playing' || state.endTime === null) {
+      return;
+    }
+
+    pausedTimeMs = Math.max(0, state.endTime - Date.now());
+    state.timeLeft = getRemainingSeconds(state.endTime);
+    state.endTime = null;
+    state.status = 'paused';
+    stopTimer();
+    pauseDialog.hidden = false;
+    renderCauldron();
+    resumeButton.focus();
+  }
+
+  function resumeGame(): void {
+    if (state.status !== 'paused') {
+      return;
+    }
+
+    if (pausedTimeMs <= 0) {
+      endGame('time');
+      return;
+    }
+
+    state.endTime = Date.now() + pausedTimeMs;
+    state.timeLeft = getRemainingSeconds(state.endTime);
+    pausedTimeMs = 0;
+    state.status = 'playing';
+    pauseDialog.hidden = true;
+    renderCauldron();
+    updateTimer();
+    timerInterval = setInterval(updateTimer, 250);
+    pauseButton.focus();
+  }
+
+  function exitToMenu(): void {
+    stopTimer();
+    state.status = 'menu';
+    state.activeRecipe = null;
+    state.cauldronIngredients = [];
+    state.shelfStock = {};
+    state.score = 0;
+    state.timeLeft = 0;
+    state.endTime = null;
+    state.lives = 0;
+    state.gameOverReason = null;
+    pausedTimeMs = 0;
+    startMessage.textContent = 'Ready to brew a potion?';
+    startButton.textContent = 'Start Game';
+    pauseDialog.hidden = true;
+    gameOverScreen.hidden = true;
+    game.hidden = true;
+    startScreen.hidden = false;
+    renderCauldron();
+    startButton.focus();
+  }
+
+  function handleVisibilityChange(): void {
+    if (document.hidden && state.status === 'playing') {
+      pauseGame();
+    }
+  }
+
+  function stopTimer(): void {
+    if (timerInterval !== undefined) {
+      clearInterval(timerInterval);
+      timerInterval = undefined;
+    }
   }
 
   function brew(): void {
@@ -272,7 +371,8 @@ export function createCauldron(): HTMLElement {
       ),
     );
     brewButton.disabled = state.status !== 'playing' || state.cauldronIngredients.length === 0;
-    clearButton.disabled = state.cauldronIngredients.length === 0;
+    clearButton.disabled = state.status !== 'playing' || state.cauldronIngredients.length === 0;
+    pauseButton.disabled = state.status !== 'playing';
     shelf.render();
   }
 

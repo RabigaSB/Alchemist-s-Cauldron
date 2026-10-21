@@ -47,7 +47,7 @@ function createIngredientCard(
 
   const stockAmount = state.shelfStock[ingredient.id] ?? 0;
   const cauldronIsFull = state.cauldronIngredients.length >= MAX_CAULDRON_INGREDIENTS;
-  card.disabled = stockAmount <= 0 || cauldronIsFull;
+  card.disabled = state.status !== 'playing' || stockAmount <= 0 || cauldronIsFull;
 
   if (stockAmount > 0) {
     const icon = document.createElement('img');

@@ -9,6 +9,6 @@ export interface IGameState {
   timeLeft: number;
   endTime: number | null;
   lives: number;
-  status: 'menu' | 'playing' | 'game-over';
+  status: 'menu' | 'playing' | 'paused' | 'game-over';
   gameOverReason: 'time' | 'lives' | 'ingredients' | null;
 }

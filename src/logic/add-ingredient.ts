@@ -6,6 +6,10 @@ export const MAX_CAULDRON_INGREDIENTS = 4;
 export function addIngredient(state: IGameState, ingredient: IIngredient): boolean {
   const stock = state.shelfStock[ingredient.id];
 
+  if (state.status !== 'playing') {
+    return false;
+  }
+
   if (state.cauldronIngredients.length >= MAX_CAULDRON_INGREDIENTS) {
     return false;
   }
