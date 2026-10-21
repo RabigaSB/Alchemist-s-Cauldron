@@ -1,5 +1,6 @@
 @use './variables.scss' as *;
 @use './base.scss' as *;
+@use './svg.scss' as *;
 
 body {
   font-family: $font-body;
@@ -7,6 +8,7 @@ body {
   color: $body-text-color;
   user-select: none;
   overflow-x: hidden;
+  margin: 20px;
 }
 
 [hidden] {
@@ -29,6 +31,10 @@ h6 {
   justify-content: center;
   width: 100%;
   height: 100%;
+  padding: 10px;
+  box-sizing: border-box;
+  border: 1px solid $border-bronze;
+  border-radius: 8px;
 
   &__title {
     font-size: 2rem;
@@ -48,8 +54,40 @@ h6 {
     font-size: 1.2rem;
   }
 
+  &__brew {
+    background: linear-gradient(180deg, #1d4d12 0%, #0c2407 100%);
+    border: 3px solid $gothic-green;
+    color: white;
+    text-shadow: 0 0 10px $gothic-green;
+    box-shadow: 0 0 20px $gothic-green-glow;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 200px;
+    height: 60px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: $font-title;
+    font-size: 1.5rem;
+
+    &:hover {
+      background: linear-gradient(180deg, #2e7d1f 0%, #1a3c0b 100%);
+      box-shadow: 0 0 30px $gothic-green-glow;
+      font-size: 1.6rem;
+    }
+
+    &::before {
+      @extend .icon-mask-pseudo;
+      background-color: white;
+      mask-image: url('../assets/icons/fire-burner-solid-full.svg');
+      margin-right: 12px;
+      width: $icon-width-large;
+      height: $icon-height-large;
+    }
+  }
+
   &__start,
-  &__brew,
   &__menu-button {
     min-width: 140px;
     padding: 10px 18px;
@@ -74,7 +112,20 @@ h6 {
     display: grid;
     justify-items: center;
     gap: 1rem;
-    width: min(100% - 2rem, 720px);
+    width: 100%;
+  }
+
+  &__middle-panel {
+    display: grid;
+    justify-items: center;
+    gap: 1rem;
+    width: 100%;
+    grid-template-columns: 3fr 5fr 4fr;
+    align-items: center;
+  }
+
+  &__bottom-panel {
+    width: 100%;
   }
 
   &__scoreboard {
@@ -184,7 +235,7 @@ h6 {
 
   &__leaderboard-dialog {
     position: fixed;
-    z-index: 20;
+    z-index: 30;
     inset: 0;
     display: grid;
     align-items: center;
@@ -247,7 +298,7 @@ h6 {
 
   &__pause-dialog {
     position: fixed;
-    z-index: 10;
+    z-index: 25;
     inset: 0;
     display: grid;
     align-content: center;
@@ -292,37 +343,66 @@ h6 {
     box-sizing: border-box;
     border: 1px solid $border-bronze;
     border-radius: 8px;
+    background-color: $recipe-bg;
+    color: $parchment-text;
+    box-shadow:
+      inset 0 0 30px rgba(80, 50, 20, 0.5),
+      3px 5px 15px rgba(0, 0, 0, 0.6);
+  }
+
+  &__recipe-text {
+    color: $recipe-text;
+    font-size: 10px;
+    text-transform: uppercase;
+    margin: 10px;
   }
 
   &__recipe {
-    color: $gothic-gold;
+    color: $dark-wood;
+    font-size: 1.2rem;
+    text-transform: uppercase;
+    padding-bottom: 10px;
+    border-bottom: 1px solid $border-bronze;
+  }
+
+  &__recipe-icon {
+    width: $icon-width-large;
+    height: $icon-height-large;
+    object-fit: contain;
+    padding: 8px;
+    filter: invert(20%) sepia(76%) saturate(1050%) hue-rotate(352deg) brightness(95%) contrast(94%);
   }
 
   &__recipe-ranges {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.5rem 1rem;
+    width: 100%;
   }
 
   &__recipe-range {
-    margin: 0;
     font-size: $fz-small;
+    padding: 10px;
+    background: antiquewhite;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
 
   &__parameters {
     display: grid;
     gap: 1rem;
-    width: min(100% - 2rem, 520px);
     margin-bottom: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   }
 
   &__ingredients-title {
-    color: $gothic-gold;
+    color: $recipe-text;
+    padding-top: 10px;
+    border-top: 1px solid $border-bronze;
+    margin-top: 0.5rem;
 
     &--full {
-      color: $gothic-green;
-      text-shadow: 0 0 8px $gothic-green-glow;
+      color: $gothic-pink;
+      text-shadow: 0 0 8px $gothic-pink-glow;
     }
   }
 
@@ -466,7 +546,6 @@ h6 {
 
 .shelf {
   width: 300px;
-  height: 400px;
   box-sizing: border-box;
   border: 1px solid $border-bronze;
   border-radius: 8px;

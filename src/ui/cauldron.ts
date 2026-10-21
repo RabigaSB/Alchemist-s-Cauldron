@@ -19,6 +19,7 @@ import type { IGameState } from '../state/game-state';
 import { createElement } from './create-element';
 import { createParameterBar } from './parameter-bar';
 import { createShelf } from './shelf';
+import { createSvgBubble } from './svg-bubble';
 
 const GAME_DIFFICULTY = 'medium';
 const STARTING_TIME = 150;
@@ -193,27 +194,43 @@ export function createCauldron(): HTMLElement {
   scoreboard.append(scoreDisplay, timeDisplay, livesDisplay, timer);
   game.appendChild(scoreboard);
 
+  //middle
+  const middlePanel = createElement('div', 'cauldron__middle-panel');
+  game.appendChild(middlePanel);
+
+  const shelf = createShelf(state, renderCauldron);
+  middlePanel.appendChild(shelf.element);
+
+  const cauldronSvg = createSvgBubble();
+  middlePanel.appendChild(cauldronSvg);
+
   const recipePanel = createElement('section', 'cauldron__recipe-panel');
+  const recipeText = createElement('div', 'cauldron__recipe-text', 'Current Recipe');
   const recipeTitle = createElement('h3', 'cauldron__recipe');
-  recipePanel.appendChild(recipeTitle);
+  recipePanel.append(recipeText, recipeTitle);
+  const recipeIcon = createElement('img', 'cauldron__recipe-icon');
+  recipeIcon.src = '/assets/icons/hand-sparkles-solid-full.svg';
+  recipeIcon.alt = 'icon';
+  recipePanel.appendChild(recipeIcon);
   const recipeRanges = createElement('div', 'cauldron__recipe-ranges');
   recipePanel.appendChild(recipeRanges);
   const ingredientsTitle = createElement('h3', 'cauldron__ingredients-title');
   recipePanel.appendChild(ingredientsTitle);
-  game.appendChild(recipePanel);
+  middlePanel.appendChild(recipePanel);
+
+  const ingredientsList = createElement('ol', 'cauldron__ingredients-list');
+  middlePanel.appendChild(ingredientsList);
+
+  //bottom
+  const bottomPanel = createElement('div', 'cauldron__bottom-panel');
+  game.appendChild(bottomPanel);
 
   const parameterBars = createElement('div', 'cauldron__parameters');
   const temperatureBar = createParameterBar('Temperature', { min: 0, max: 0 }, -80, 100);
   const densityBar = createParameterBar('Density', { min: 0, max: 0 }, -40, 120);
   const magicPowerBar = createParameterBar('Magic Power', { min: 0, max: 0 }, 0, 160);
   parameterBars.append(temperatureBar.element, densityBar.element, magicPowerBar.element);
-  game.appendChild(parameterBars);
-
-  const shelf = createShelf(state, renderCauldron);
-  game.appendChild(shelf.element);
-
-  const ingredientsList = createElement('ol', 'cauldron__ingredients-list');
-  game.appendChild(ingredientsList);
+  bottomPanel.appendChild(parameterBars);
 
   const actions = createElement('div', 'cauldron__actions');
   const pauseButton = createElement('button', 'cauldron__pause', 'Pause');
@@ -236,7 +253,7 @@ export function createCauldron(): HTMLElement {
     finishIfIngredientsExhausted();
   });
   actions.appendChild(clearButton);
-  game.appendChild(actions);
+  bottomPanel.appendChild(actions);
 
   const resultMessage = createElement('p', 'cauldron__result');
   resultMessage.setAttribute('aria-live', 'polite');
@@ -596,7 +613,10 @@ function getGameOverMessage(reason: NonNullable<IGameState['gameOverReason']>): 
 }
 
 function createRangeLabel(label: string, range: IRecipeRange): HTMLElement {
-  return createElement('p', 'cauldron__recipe-range', `${label}: ${range.min}..${range.max}`);
+  const spanRange = createElement('span', '', `(${range.min};  ${range.max})`);
+  const container = createElement('p', 'cauldron__recipe-range', `${label}: `);
+  container.appendChild(spanRange);
+  return container;
 }
 
 function createLeaderboardHeader(): HTMLTableSectionElement {
