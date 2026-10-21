@@ -31,6 +31,18 @@ h6 {
     margin-bottom: 1rem;
   }
 
+  &__recipe {
+    margin-bottom: 0.75rem;
+    color: $gothic-gold;
+  }
+
+  &__parameters {
+    display: grid;
+    gap: 1rem;
+    width: min(100% - 2rem, 520px);
+    margin-bottom: 1rem;
+  }
+
   &__ingredients-title {
     margin-top: 1rem;
     color: $gothic-gold;
@@ -59,6 +71,97 @@ h6 {
       opacity: 0.5;
       cursor: not-allowed;
     }
+  }
+}
+
+.parameter-bar {
+  --bar-color: #{$stat-temp};
+
+  &__heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.4rem;
+  }
+
+  &__name {
+    font-size: $fz-small;
+    color: $gothic-gold;
+  }
+
+  &__value {
+    font-family: $font-title;
+    color: $body-text-color;
+  }
+
+  &__track {
+    position: relative;
+    height: 14px;
+    overflow: visible;
+    border: 1px solid $border-bronze;
+    border-radius: 999px;
+    background-color: rgba(0, 0, 0, 0.35);
+  }
+
+  &__target {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-radius: inherit;
+    background-color: rgba(58, 130, 246, 0.35);
+    box-shadow: inset 0 0 0 1px rgba(150, 190, 255, 0.7);
+  }
+
+  &__zero {
+    position: absolute;
+    top: -3px;
+    bottom: -3px;
+    width: 1px;
+    background-color: rgba(255, 255, 255, 0.7);
+    transform: translateX(-50%);
+  }
+
+  &__marker {
+    position: absolute;
+    z-index: 1;
+    top: 50%;
+    left: 0;
+    width: 12px;
+    height: 22px;
+    border: 2px solid $body-text-color;
+    border-radius: 999px;
+    background-color: var(--bar-color);
+    box-shadow: 0 0 5px var(--bar-color);
+    transform: translate(-50%, -50%);
+    transition:
+      left 350ms ease,
+      box-shadow 350ms ease;
+  }
+
+  &:nth-child(2) {
+    --bar-color: #{$stat-density};
+  }
+
+  &:nth-child(3) {
+    --bar-color: #{$stat-magic};
+  }
+
+  &--in-range &__target {
+    background-color: rgba(57, 190, 99, 0.45);
+    box-shadow:
+      0 0 10px rgba(57, 220, 110, 0.9),
+      inset 0 0 0 1px rgba(136, 255, 171, 0.9);
+  }
+
+  &--in-range &__marker {
+    box-shadow: 0 0 10px rgba(57, 220, 110, 0.95);
+  }
+
+  &__range {
+    margin-top: 0.3rem;
+    font-size: $fz-small;
+    opacity: 0.8;
   }
 }
 
