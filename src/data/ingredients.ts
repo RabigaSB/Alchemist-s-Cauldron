@@ -11,7 +11,7 @@ export const INGREDIENTS: IIngredient[] = [
   {
     id: 'dragon-tears',
     name: 'Dragon Tears',
-    icon: '/assets/icons/dragon-tears.svg',
+    icon: '/assets/icons/droplet-solid-full.svg',
     temperature: 25,
     density: 8,
     magicPower: 10,
@@ -19,7 +19,7 @@ export const INGREDIENTS: IIngredient[] = [
   {
     id: 'fairy-dust',
     name: 'Fairy Dust',
-    icon: '/assets/icons/fairy-dust.svg',
+    icon: '/assets/icons/wand-sparkles-solid-full.svg',
     temperature: 12,
     density: 9,
     magicPower: 12,
@@ -27,7 +27,7 @@ export const INGREDIENTS: IIngredient[] = [
   {
     id: 'frost-lotus',
     name: 'Frost Lotus',
-    icon: '/assets/icons/frost-lotus.svg',
+    icon: '/assets/icons/spa-solid-full.svg',
     temperature: -18,
     density: 4,
     magicPower: 14,
@@ -35,7 +35,7 @@ export const INGREDIENTS: IIngredient[] = [
   {
     id: 'mandrake-root',
     name: 'Mandrake Root',
-    icon: '/assets/icons/mandrake-root.svg',
+    icon: '/assets/icons/plant-wilt-solid-full.svg',
     temperature: -5,
     density: 20,
     magicPower: 8,
@@ -43,7 +43,7 @@ export const INGREDIENTS: IIngredient[] = [
   {
     id: 'caustic-acid',
     name: 'Caustic Acid',
-    icon: '/assets/icons/caustic-acid.svg',
+    icon: '/assets/icons/vial-solid-full.svg',
     temperature: 10,
     density: 14,
     magicPower: 22,
@@ -51,7 +51,7 @@ export const INGREDIENTS: IIngredient[] = [
   {
     id: 'essence-of-the-void',
     name: 'Essence of the Void',
-    icon: '/assets/icons/essence-of-the-void.svg',
+    icon: '/assets/icons/snowflake-solid-full.svg',
     temperature: -20,
     density: -10,
     magicPower: 40,
@@ -59,7 +59,7 @@ export const INGREDIENTS: IIngredient[] = [
   {
     id: 'phoenix-feather',
     name: 'Phoenix Feather',
-    icon: '/assets/icons/phoenix-feather.svg',
+    icon: '/assets/icons/feather-solid-full.svg',
     temperature: 50,
     density: -10,
     magicPower: 30,
@@ -67,7 +67,7 @@ export const INGREDIENTS: IIngredient[] = [
   {
     id: 'toad-slime',
     name: 'Toad Slime',
-    icon: '/assets/icons/toad-slime.svg',
+    icon: '/assets/icons/worm-solid-full.svg',
     temperature: 5,
     density: 30,
     magicPower: 0,
