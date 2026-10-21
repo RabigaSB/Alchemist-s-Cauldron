@@ -30,6 +30,36 @@ h6 {
     font-size: 2rem;
     margin-bottom: 1rem;
   }
+
+  &__ingredients-title {
+    margin-top: 1rem;
+    color: $gothic-gold;
+  }
+
+  &__ingredients-list {
+    align-self: stretch;
+    min-height: 2rem;
+    margin: 0.5rem 0;
+    padding-left: 2rem;
+  }
+
+  &__ingredient {
+    padding: 2px 0;
+  }
+
+  &__clear {
+    padding: 8px 12px;
+    border: 1px solid $border-bronze;
+    border-radius: 8px;
+    color: $gothic-gold;
+    background-color: transparent;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
 }
 
 .shelf {
@@ -81,6 +111,14 @@ h6 {
 
   &:hover {
     border-color: $gothic-green;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+  }
+
+  &--empty {
+    opacity: 0.45;
   }
 
   &__icon {

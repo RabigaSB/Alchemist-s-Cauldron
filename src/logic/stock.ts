@@ -1,7 +1,9 @@
-import { INGREDIENTS } from '../data/ingredients';
+import { INGREDIENTS, type IIngredient } from '../data/ingredients';
 
-export function createStock(): Record<string, number> {
-  return Object.fromEntries(INGREDIENTS.map((ingredient) => [ingredient.id, getRandomStock()]));
+export function createStock(
+  ingredients: readonly IIngredient[] = INGREDIENTS,
+): Record<string, number> {
+  return Object.fromEntries(ingredients.map((ingredient) => [ingredient.id, getRandomStock()]));
 }
 
 export function getRandomStock(): number {

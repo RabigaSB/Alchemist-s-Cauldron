@@ -1,7 +1,7 @@
 import type { IIngredient } from '../data/ingredients';
 import type { IGameState } from '../state/game-state';
 
-const MAX_CAULDRON_INGREDIENTS = 4;
+export const MAX_CAULDRON_INGREDIENTS = 4;
 
 export function addIngredient(state: IGameState, ingredient: IIngredient): boolean {
   const stock = state.shelfStock[ingredient.id];

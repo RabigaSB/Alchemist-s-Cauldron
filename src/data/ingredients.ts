@@ -1,3 +1,12 @@
+import dropletIcon from '../assets/icons/droplet-solid-full.svg';
+import featherIcon from '../assets/icons/feather-solid-full.svg';
+import glassWaterIcon from '../assets/icons/glass-water-solid-full.svg';
+import plantWiltIcon from '../assets/icons/plant-wilt-solid-full.svg';
+import spaIcon from '../assets/icons/spa-solid-full.svg';
+import vialIcon from '../assets/icons/vial-solid-full.svg';
+import wandSparklesIcon from '../assets/icons/wand-sparkles-solid-full.svg';
+import wormIcon from '../assets/icons/worm-solid-full.svg';
+
 export interface IIngredient {
   id: string;
   name: string;
@@ -11,7 +20,7 @@ export const INGREDIENTS: IIngredient[] = [
   {
     id: 'dragon-tears',
     name: 'Dragon Tears',
-    icon: '/assets/icons/droplet-solid-full.svg',
+    icon: dropletIcon,
     temperature: 25,
     density: 8,
     magicPower: 10,
@@ -19,7 +28,7 @@ export const INGREDIENTS: IIngredient[] = [
   {
     id: 'fairy-dust',
     name: 'Fairy Dust',
-    icon: '/assets/icons/wand-sparkles-solid-full.svg',
+    icon: wandSparklesIcon,
     temperature: 12,
     density: 9,
     magicPower: 12,
@@ -27,7 +36,7 @@ export const INGREDIENTS: IIngredient[] = [
   {
     id: 'frost-lotus',
     name: 'Frost Lotus',
-    icon: '/assets/icons/spa-solid-full.svg',
+    icon: spaIcon,
     temperature: -18,
     density: 4,
     magicPower: 14,
@@ -35,7 +44,7 @@ export const INGREDIENTS: IIngredient[] = [
   {
     id: 'mandrake-root',
     name: 'Mandrake Root',
-    icon: '/assets/icons/plant-wilt-solid-full.svg',
+    icon: plantWiltIcon,
     temperature: -5,
     density: 20,
     magicPower: 8,
@@ -43,7 +52,7 @@ export const INGREDIENTS: IIngredient[] = [
   {
     id: 'caustic-acid',
     name: 'Caustic Acid',
-    icon: '/assets/icons/vial-solid-full.svg',
+    icon: vialIcon,
     temperature: 10,
     density: 14,
     magicPower: 22,
@@ -51,7 +60,7 @@ export const INGREDIENTS: IIngredient[] = [
   {
     id: 'essence-of-the-void',
     name: 'Essence of the Void',
-    icon: '/assets/icons/snowflake-solid-full.svg',
+    icon: glassWaterIcon,
     temperature: -20,
     density: -10,
     magicPower: 40,
@@ -59,7 +68,7 @@ export const INGREDIENTS: IIngredient[] = [
   {
     id: 'phoenix-feather',
     name: 'Phoenix Feather',
-    icon: '/assets/icons/feather-solid-full.svg',
+    icon: featherIcon,
     temperature: 50,
     density: -10,
     magicPower: 30,
@@ -67,7 +76,7 @@ export const INGREDIENTS: IIngredient[] = [
   {
     id: 'toad-slime',
     name: 'Toad Slime',
-    icon: '/assets/icons/worm-solid-full.svg',
+    icon: wormIcon,
     temperature: 5,
     density: 30,
     magicPower: 0,

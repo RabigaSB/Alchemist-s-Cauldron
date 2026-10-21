@@ -1,8 +1,16 @@
 import { INGREDIENTS } from '../data/ingredients';
 import type { IIngredient } from '../data/ingredients';
-import { getRandomStock } from '../logic/stock';
+import { addIngredient, MAX_CAULDRON_INGREDIENTS } from '../logic/add-ingredient';
+import type { IGameState } from '../state/game-state';
 
-export function createShelf(): HTMLElement {
+const SHELF_INGREDIENTS = INGREDIENTS.slice(0, 6);
+
+export interface IShelfView {
+  element: HTMLElement;
+  render: () => void;
+}
+
+export function createShelf(state: IGameState, onIngredientAdded: () => void): IShelfView {
   const shelf = document.createElement('section');
   shelf.className = 'shelf';
 
@@ -15,24 +23,50 @@ export function createShelf(): HTMLElement {
   ingredientsContainer.className = 'shelf__ingredients';
   shelf.appendChild(ingredientsContainer);
 
-  INGREDIENTS.forEach((ingredient) => {
-    const ingredientCard = createIngredientCard(ingredient);
-    ingredientsContainer.appendChild(ingredientCard);
-  });
+  function render(): void {
+    ingredientsContainer.replaceChildren(
+      ...SHELF_INGREDIENTS.map((ingredient) =>
+        createIngredientCard(ingredient, state, () => {
+          onIngredientAdded();
+          render();
+        }),
+      ),
+    );
+  }
 
-  return shelf;
+  render();
+
+  return { element: shelf, render };
 }
 
-function createIngredientCard(ingredient: IIngredient): HTMLElement {
+function createIngredientCard(
+  ingredient: IIngredient,
+  state: IGameState,
+  onIngredientAdded: () => void,
+): HTMLButtonElement {
   const card = document.createElement('button');
   card.type = 'button';
   card.className = 'ingredient-card';
 
-  const icon = document.createElement('img');
-  icon.className = 'ingredient-card__icon';
-  icon.src = `${ingredient.icon}`;
-  icon.alt = ingredient.name;
-  card.appendChild(icon);
+  const stockAmount = state.shelfStock[ingredient.id] ?? 0;
+  const cauldronIsFull = state.cauldronIngredients.length >= MAX_CAULDRON_INGREDIENTS;
+  card.disabled = stockAmount <= 0 || cauldronIsFull;
+
+  if (stockAmount > 0) {
+    const icon = document.createElement('img');
+    icon.className = 'ingredient-card__icon';
+    icon.src = ingredient.icon;
+    icon.alt = '';
+    card.appendChild(icon);
+  } else {
+    card.classList.add('ingredient-card--empty');
+  }
+
+  card.addEventListener('click', () => {
+    if (addIngredient(state, ingredient)) {
+      onIngredientAdded();
+    }
+  });
 
   const description = document.createElement('div');
   description.className = 'ingredient-card__description';
@@ -64,7 +98,7 @@ function createIngredientCard(ingredient: IIngredient): HTMLElement {
 
   const stock = document.createElement('span');
   stock.className = 'ingredient-card__stock';
-  stock.textContent = `${getRandomStock()}`;
+  stock.textContent = `${stockAmount}`;
   properties.appendChild(stock);
 
   return card;
