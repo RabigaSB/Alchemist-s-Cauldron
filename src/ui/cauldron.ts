@@ -4,6 +4,7 @@ import type { IDifficultySettings } from '../data/difficulty';
 import type { IRecipeRange } from '../data/recipes';
 import type { Difficulty } from '../data/recipes';
 import { pickRandomRecipe } from '../data/recipes';
+import { addIngredient } from '../logic/add-ingredient';
 import { isBrewSuccessful } from '../logic/brew-check';
 import { calculateCauldron } from '../logic/calculate-cauldron';
 import { createStock } from '../logic/stock';
@@ -301,6 +302,10 @@ export function createCauldron(): HTMLElement {
   middlePanel.appendChild(shelf.element);
 
   const cauldronSvg = createSvgBubble();
+  cauldronSvg.classList.add('cauldron__drop-target');
+  cauldronSvg.addEventListener('dragover', handleIngredientDragOver);
+  cauldronSvg.addEventListener('dragleave', handleIngredientDragLeave);
+  cauldronSvg.addEventListener('drop', handleIngredientDrop);
   middlePanel.appendChild(cauldronSvg);
 
   const recipePanel = createElement('section', 'cauldron__recipe-panel');
@@ -564,6 +569,55 @@ export function createCauldron(): HTMLElement {
     }
 
     finishIfIngredientsExhausted();
+  }
+
+  function handleIngredientDragOver(event: DragEvent): void {
+    const maxIngredients = DIFFICULTY_SETTINGS[state.difficulty].maxCauldronIngredients;
+    const hasIngredientPayload =
+      event.dataTransfer?.types.includes('application/x-alchemist-ingredient') ?? false;
+
+    if (
+      state.status !== 'playing' ||
+      state.cauldronIngredients.length >= maxIngredients ||
+      !hasIngredientPayload
+    ) {
+      cauldronSvg.classList.remove('cauldron__drop-target--active');
+      return;
+    }
+
+    event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'move';
+    }
+    cauldronSvg.classList.add('cauldron__drop-target--active');
+  }
+
+  function handleIngredientDragLeave(event: DragEvent): void {
+    if (event.relatedTarget instanceof Node && cauldronSvg.contains(event.relatedTarget)) {
+      return;
+    }
+
+    cauldronSvg.classList.remove('cauldron__drop-target--active');
+  }
+
+  function handleIngredientDrop(event: DragEvent): void {
+    event.preventDefault();
+    cauldronSvg.classList.remove('cauldron__drop-target--active');
+
+    if (state.status !== 'playing' || event.dataTransfer === null) {
+      return;
+    }
+
+    const ingredientId = event.dataTransfer.getData('application/x-alchemist-ingredient');
+    const ingredient = INGREDIENTS.find((item) => item.id === ingredientId);
+    if (ingredient === undefined) {
+      return;
+    }
+
+    const maxIngredients = DIFFICULTY_SETTINGS[state.difficulty].maxCauldronIngredients;
+    if (addIngredient(state, ingredient, maxIngredients)) {
+      renderCauldron();
+    }
   }
 
   function updateTimer(): boolean {
