@@ -6,7 +6,7 @@ export const BREW_TOLERANCE = 8;
 export function isBrewSuccessful(
   values: ICauldronValues,
   recipe: IRecipe,
-  tolerance = BREW_TOLERANCE,
+  tolerance: number = BREW_TOLERANCE,
 ): boolean {
   return (
     isWithinExpandedRange(

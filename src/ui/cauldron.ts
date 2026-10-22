@@ -1,8 +1,10 @@
 import { INGREDIENTS } from '../data/ingredients';
+import { DIFFICULTY_SETTINGS } from '../data/difficulty';
+import type { IDifficultySettings } from '../data/difficulty';
 import type { IRecipeRange } from '../data/recipes';
+import type { Difficulty } from '../data/recipes';
 import { pickRandomRecipe } from '../data/recipes';
 import { isBrewSuccessful } from '../logic/brew-check';
-import { MAX_CAULDRON_INGREDIENTS } from '../logic/add-ingredient';
 import { calculateCauldron } from '../logic/calculate-cauldron';
 import { createStock } from '../logic/stock';
 import { formatTime, getRemainingSeconds, hasIngredientsRemaining } from '../logic/timer';
@@ -21,17 +23,10 @@ import { createParameterBar } from './parameter-bar';
 import { createShelf } from './shelf';
 import { createSvgBubble } from './svg-bubble';
 
-const GAME_DIFFICULTY = 'medium';
-const STARTING_TIME = 150;
-const STARTING_LIVES = 3;
-const SCORE_PER_BREW = 200;
-const TIME_BONUS_PER_BREW = 10;
-const MAX_TIME = 150;
-
 export function createCauldron(): HTMLElement {
   const cauldron = createElement('section', 'cauldron');
-  const shelfIngredients = INGREDIENTS.slice(0, 6);
   const state: IGameState = {
+    difficulty: 'medium',
     cauldronIngredients: [],
     shelfStock: {},
     activeRecipe: null,
@@ -49,14 +44,102 @@ export function createCauldron(): HTMLElement {
   const startScreen = createElement('div', 'cauldron__start-screen');
   const startMessage = createElement('p', 'cauldron__start-message', 'Ready to brew a potion?');
   startScreen.appendChild(startMessage);
+  const menuPreview = createElement('div', 'cauldron__menu-preview');
+  menuPreview.append(
+    createElement('p', 'cauldron__menu-empty-shelf', 'Ingredients Shelf: Empty'),
+    createElement('p', 'cauldron__menu-empty-cauldron', 'Cauldron: Empty'),
+  );
+  startScreen.appendChild(menuPreview);
+  const menuSummary = createElement('p', 'cauldron__menu-summary');
+  startScreen.appendChild(menuSummary);
+  const selectedDifficulty = createElement('p', 'cauldron__selected-difficulty');
+  startScreen.appendChild(selectedDifficulty);
+  const menuActions = createElement('div', 'cauldron__menu-actions');
   const startButton = createElement('button', 'cauldron__start', 'Start Game');
   startButton.type = 'button';
   startButton.addEventListener('click', startGame);
-  startScreen.appendChild(startButton);
+  menuActions.appendChild(startButton);
+  const settingsButton = createElement('button', 'cauldron__menu-button', 'Settings');
+  settingsButton.type = 'button';
+  menuActions.appendChild(settingsButton);
+  const helpButton = createElement('button', 'cauldron__menu-button', 'Help');
+  helpButton.type = 'button';
+  menuActions.appendChild(helpButton);
   const startLeaderboardButton = createElement('button', 'cauldron__menu-button', 'Leaderboard');
   startLeaderboardButton.type = 'button';
   startLeaderboardButton.addEventListener('click', openLeaderboard);
-  startScreen.appendChild(startLeaderboardButton);
+  menuActions.appendChild(startLeaderboardButton);
+  startScreen.appendChild(menuActions);
+
+  const settingsPanel = createElement('section', 'cauldron__menu-dialog');
+  settingsPanel.hidden = true;
+  settingsPanel.setAttribute('role', 'dialog');
+  settingsPanel.setAttribute('aria-modal', 'true');
+  settingsPanel.setAttribute('aria-labelledby', 'settings-title');
+  const settingsTitle = createElement('h2', 'cauldron__menu-dialog-title', 'Difficulty Settings');
+  settingsTitle.id = 'settings-title';
+  settingsPanel.appendChild(settingsTitle);
+  const difficultyButtons = createElement('div', 'cauldron__difficulty-options');
+  (Object.keys(DIFFICULTY_SETTINGS) as Difficulty[]).forEach((difficulty) => {
+    const settings = DIFFICULTY_SETTINGS[difficulty];
+    const button = createElement('button', 'cauldron__difficulty-option');
+    button.type = 'button';
+    button.dataset.difficulty = difficulty;
+    button.addEventListener('click', () => {
+      state.difficulty = difficulty;
+      updateMenuSummary();
+      settingsPanel.hidden = true;
+    });
+    button.append(
+      createElement('strong', 'cauldron__difficulty-name', settings.label),
+      createElement('span', 'cauldron__difficulty-summary', createDifficultySummary(settings)),
+    );
+    difficultyButtons.appendChild(button);
+  });
+  settingsPanel.appendChild(difficultyButtons);
+  const closeSettingsButton = createElement('button', 'cauldron__menu-button', 'Close');
+  closeSettingsButton.type = 'button';
+  closeSettingsButton.addEventListener('click', () => {
+    settingsPanel.hidden = true;
+    settingsButton.focus();
+  });
+  settingsPanel.appendChild(closeSettingsButton);
+  settingsButton.addEventListener('click', () => {
+    settingsPanel.hidden = false;
+    closeSettingsButton.focus();
+  });
+  cauldron.appendChild(settingsPanel);
+
+  const helpPanel = createElement('section', 'cauldron__menu-dialog');
+  helpPanel.hidden = true;
+  helpPanel.setAttribute('role', 'dialog');
+  helpPanel.setAttribute('aria-modal', 'true');
+  helpPanel.setAttribute('aria-labelledby', 'help-title');
+  const helpTitle = createElement('h2', 'cauldron__menu-dialog-title', 'How to Play');
+  helpTitle.id = 'help-title';
+  helpPanel.appendChild(helpTitle);
+  const helpRules = createElement('ul', 'cauldron__help-rules');
+  [
+    'Choose a difficulty in Settings, then start a game.',
+    'Add ingredients to the cauldron. Each portion uses one stock.',
+    'Move Temperature, Density, and Magic Power into the recipe ranges.',
+    'Brew checks all three values using the selected difficulty tolerance.',
+    'A successful brew earns points and time. A failed brew costs a life.',
+    'Pause to stop the timer. The game ends when time, lives, or ingredients run out.',
+  ].forEach((rule) => helpRules.appendChild(createElement('li', undefined, rule)));
+  helpPanel.appendChild(helpRules);
+  const closeHelpButton = createElement('button', 'cauldron__menu-button', 'Close');
+  closeHelpButton.type = 'button';
+  closeHelpButton.addEventListener('click', () => {
+    helpPanel.hidden = true;
+    helpButton.focus();
+  });
+  helpPanel.appendChild(closeHelpButton);
+  helpButton.addEventListener('click', () => {
+    helpPanel.hidden = false;
+    closeHelpButton.focus();
+  });
+  cauldron.appendChild(helpPanel);
   cauldron.appendChild(startScreen);
 
   const gameOverScreen = createElement('section', 'cauldron__game-over');
@@ -109,7 +192,7 @@ export function createCauldron(): HTMLElement {
   leaderboardDialog.setAttribute('aria-modal', 'true');
   leaderboardDialog.setAttribute('aria-labelledby', 'leaderboard-title');
   const leaderboardContent = createElement('div', 'cauldron__leaderboard-content');
-  const leaderboardTitle = createElement('h2', 'cauldron__leaderboard-title', 'Top 10 Players');
+  const leaderboardTitle = createElement('h2', 'cauldron__leaderboard-title');
   leaderboardTitle.id = 'leaderboard-title';
   leaderboardContent.appendChild(leaderboardTitle);
   const leaderboardStatus = createElement('p', 'cauldron__leaderboard-status');
@@ -181,6 +264,7 @@ export function createCauldron(): HTMLElement {
 
   const scoreboard = createElement('div', 'cauldron__scoreboard');
   const scoreDisplay = createElement('span', 'cauldron__score');
+  const difficultyDisplay = createElement('span', 'cauldron__difficulty');
   const timeDisplay = createElement('output', 'cauldron__time');
   timeDisplay.setAttribute('aria-live', 'off');
   const livesDisplay = createElement('span', 'cauldron__lives');
@@ -188,17 +272,22 @@ export function createCauldron(): HTMLElement {
   timer.setAttribute('role', 'progressbar');
   timer.setAttribute('aria-label', 'Time remaining');
   timer.setAttribute('aria-valuemin', '0');
-  timer.setAttribute('aria-valuemax', `${STARTING_TIME}`);
+  timer.setAttribute('aria-valuemax', `${DIFFICULTY_SETTINGS[state.difficulty].startingTime}`);
   const timerFill = createElement('span', 'cauldron__timer-fill');
   timer.appendChild(timerFill);
-  scoreboard.append(scoreDisplay, timeDisplay, livesDisplay, timer);
+  scoreboard.append(scoreDisplay, difficultyDisplay, timeDisplay, livesDisplay, timer);
   game.appendChild(scoreboard);
 
   //middle
   const middlePanel = createElement('div', 'cauldron__middle-panel');
   game.appendChild(middlePanel);
 
-  const shelf = createShelf(state, renderCauldron);
+  const shelf = createShelf(
+    state,
+    renderCauldron,
+    () => DIFFICULTY_SETTINGS[state.difficulty].ingredientsOnShelf,
+    () => DIFFICULTY_SETTINGS[state.difficulty].maxCauldronIngredients,
+  );
   middlePanel.appendChild(shelf.element);
 
   const cauldronSvg = createSvgBubble();
@@ -265,24 +354,27 @@ export function createCauldron(): HTMLElement {
   let pausedTimeMs = 0;
   let leaderboardReturnFocus: HTMLElement | null = null;
 
+  updateMenuSummary();
   document.addEventListener('visibilitychange', handleVisibilityChange);
 
   function startGame(): void {
-    if (timerInterval !== undefined) {
-      clearInterval(timerInterval);
-    }
+    stopTimer();
 
     state.cauldronIngredients = [];
-    state.shelfStock = createStock(shelfIngredients);
-    state.activeRecipe = pickRandomRecipe(GAME_DIFFICULTY);
+    const settings = DIFFICULTY_SETTINGS[state.difficulty];
+    state.shelfStock = createStock(INGREDIENTS.slice(0, settings.ingredientsOnShelf));
+    state.activeRecipe = pickRandomRecipe(state.difficulty);
     state.score = 0;
-    state.timeLeft = STARTING_TIME;
-    state.endTime = Date.now() + STARTING_TIME * 1000;
+    state.timeLeft = settings.startingTime;
+    state.endTime = Date.now() + settings.startingTime * 1000;
     pausedTimeMs = 0;
-    state.lives = STARTING_LIVES;
+    state.lives = settings.lives;
     state.status = 'playing';
     state.gameOverReason = null;
+    timer.setAttribute('aria-valuemax', `${settings.startingTime}`);
     resultMessage.textContent = '';
+    settingsPanel.hidden = true;
+    helpPanel.hidden = true;
     nameForm.hidden = true;
     nameInput.value = '';
     nameError.textContent = '';
@@ -381,18 +473,23 @@ export function createCauldron(): HTMLElement {
     }
 
     const values = calculateCauldron(state.cauldronIngredients);
-    const successful = isBrewSuccessful(values, state.activeRecipe);
+    const successful = isBrewSuccessful(
+      values,
+      state.activeRecipe,
+      DIFFICULTY_SETTINGS[state.difficulty].tolerance,
+    );
     state.cauldronIngredients = [];
 
     if (successful) {
-      state.score += SCORE_PER_BREW;
+      const settings = DIFFICULTY_SETTINGS[state.difficulty];
+      state.score += settings.scorePerBrew;
       const now = Date.now();
       state.endTime = Math.min(
-        (state.endTime ?? now) + TIME_BONUS_PER_BREW * 1000,
-        now + MAX_TIME * 1000,
+        (state.endTime ?? now) + settings.timeBonusPerBrew * 1000,
+        now + settings.startingTime * 1000,
       );
       state.timeLeft = getRemainingSeconds(state.endTime, now);
-      state.activeRecipe = pickRandomRecipe(GAME_DIFFICULTY);
+      state.activeRecipe = pickRandomRecipe(state.difficulty);
       resultMessage.textContent = 'Success! The potion is brewed.';
     } else {
       state.lives -= 1;
@@ -427,7 +524,8 @@ export function createCauldron(): HTMLElement {
 
   function updateTimerDisplay(): void {
     timeDisplay.value = formatTime(state.timeLeft);
-    timerFill.style.width = `${(state.timeLeft / STARTING_TIME) * 100}%`;
+    const startingTime = DIFFICULTY_SETTINGS[state.difficulty].startingTime;
+    timerFill.style.width = `${(state.timeLeft / startingTime) * 100}%`;
     timer.setAttribute('aria-valuenow', `${state.timeLeft}`);
     timer.classList.toggle('cauldron__timer--urgent', state.timeLeft < 15);
     timeDisplay.classList.toggle('cauldron__time--urgent', state.timeLeft < 15);
@@ -459,7 +557,7 @@ export function createCauldron(): HTMLElement {
     nameError.textContent = '';
     nameInput.value = '';
     scoreSaveStatus.textContent = '';
-    const leaderboard = readLeaderboard();
+    const leaderboard = readLeaderboard(state.difficulty);
     if (leaderboard.success && qualifiesForLeaderboard(state.score, leaderboard.entries)) {
       nameForm.hidden = false;
     } else {
@@ -486,7 +584,7 @@ export function createCauldron(): HTMLElement {
       return;
     }
 
-    const result = addLeaderboardEntry(name, state.score);
+    const result = addLeaderboardEntry(name, state.score, state.difficulty);
     if (!result.success) {
       nameError.textContent = result.error;
       return;
@@ -512,7 +610,8 @@ export function createCauldron(): HTMLElement {
   }
 
   function renderLeaderboard(): void {
-    const result = readLeaderboard();
+    leaderboardTitle.textContent = `Top 10 Players — ${DIFFICULTY_SETTINGS[state.difficulty].label}`;
+    const result = readLeaderboard(state.difficulty);
     leaderboardStatus.textContent = result.success ? '' : result.error;
     leaderboardTable.replaceChildren();
 
@@ -529,7 +628,7 @@ export function createCauldron(): HTMLElement {
       const emptyRow = createElement('tr');
       const emptyCell = createElement('td');
       emptyCell.textContent = 'No scores yet.';
-      emptyCell.colSpan = 4;
+      emptyCell.colSpan = 5;
       emptyRow.appendChild(emptyCell);
       body.appendChild(emptyRow);
     }
@@ -550,7 +649,7 @@ export function createCauldron(): HTMLElement {
   }
 
   function confirmClearLeaderboard(): void {
-    const result = clearLeaderboard();
+    const result = clearLeaderboard(state.difficulty);
     if (result.success) {
       hideClearConfirmation();
       renderLeaderboard();
@@ -558,6 +657,16 @@ export function createCauldron(): HTMLElement {
     } else {
       clearConfirmationStatus.textContent = result.error;
     }
+  }
+
+  function updateMenuSummary(): void {
+    const settings = DIFFICULTY_SETTINGS[state.difficulty];
+    menuSummary.textContent = 'Score: 0 · Time: 00:00 · Lives: none';
+    selectedDifficulty.textContent = `Difficulty: ${settings.label}`;
+    difficultyButtons.querySelectorAll<HTMLButtonElement>('[data-difficulty]').forEach((button) => {
+      const isSelected = button.dataset.difficulty === state.difficulty;
+      button.setAttribute('aria-pressed', `${isSelected}`);
+    });
   }
 
   function renderCauldron(): void {
@@ -578,11 +687,13 @@ export function createCauldron(): HTMLElement {
     }
 
     scoreDisplay.textContent = `Score: ${state.score}`;
+    difficultyDisplay.textContent = `Difficulty: ${DIFFICULTY_SETTINGS[state.difficulty].label}`;
     livesDisplay.textContent = `Lives: ${state.lives}`;
-    ingredientsTitle.textContent = `Ingredients: ${state.cauldronIngredients.length} / ${MAX_CAULDRON_INGREDIENTS}`;
+    const maxIngredients = DIFFICULTY_SETTINGS[state.difficulty].maxCauldronIngredients;
+    ingredientsTitle.textContent = `Ingredients: ${state.cauldronIngredients.length} / ${maxIngredients}`;
     ingredientsTitle.classList.toggle(
       'cauldron__ingredients-title--full',
-      state.cauldronIngredients.length >= MAX_CAULDRON_INGREDIENTS,
+      state.cauldronIngredients.length >= maxIngredients,
     );
     ingredientsList.replaceChildren(
       ...state.cauldronIngredients.map((ingredient) =>
@@ -623,7 +734,7 @@ function createLeaderboardHeader(): HTMLTableSectionElement {
   const header = createElement('thead');
   const row = createElement('tr');
 
-  ['Rank', 'Name', 'Score', 'Date'].forEach((label) => {
+  ['Rank', 'Name', 'Score', 'Difficulty', 'Date'].forEach((label) => {
     const cell = createElement('th');
     cell.scope = 'col';
     cell.textContent = label;
@@ -636,7 +747,13 @@ function createLeaderboardHeader(): HTMLTableSectionElement {
 
 function createLeaderboardRow(entry: ILeaderboardEntry, rank: number): HTMLTableRowElement {
   const row = createElement('tr');
-  const values = [`${rank}`, entry.name, `${entry.score}`, formatLeaderboardDate(entry.timestamp)];
+  const values = [
+    `${rank}`,
+    entry.name,
+    `${entry.score}`,
+    DIFFICULTY_SETTINGS[entry.difficulty].label,
+    formatLeaderboardDate(entry.timestamp),
+  ];
 
   values.forEach((value) => {
     const cell = createElement('td');
@@ -645,4 +762,17 @@ function createLeaderboardRow(entry: ILeaderboardEntry, rank: number): HTMLTable
   });
 
   return row;
+}
+
+function createDifficultySummary(settings: IDifficultySettings): string {
+  return [
+    `${settings.ingredientsOnShelf} ingredients`,
+    `cauldron ${settings.maxCauldronIngredients}`,
+    `${settings.startingTime}s`,
+    `±${settings.tolerance}`,
+    `${settings.lives} lives`,
+    `${settings.scorePerBrew} pts`,
+    `+${settings.timeBonusPerBrew}s`,
+    `${settings.reactions} reactions`,
+  ].join(' · ');
 }

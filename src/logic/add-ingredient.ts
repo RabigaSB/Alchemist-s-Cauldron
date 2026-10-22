@@ -3,14 +3,18 @@ import type { IGameState } from '../state/game-state';
 
 export const MAX_CAULDRON_INGREDIENTS = 4;
 
-export function addIngredient(state: IGameState, ingredient: IIngredient): boolean {
+export function addIngredient(
+  state: IGameState,
+  ingredient: IIngredient,
+  maxIngredients = MAX_CAULDRON_INGREDIENTS,
+): boolean {
   const stock = state.shelfStock[ingredient.id];
 
   if (state.status !== 'playing') {
     return false;
   }
 
-  if (state.cauldronIngredients.length >= MAX_CAULDRON_INGREDIENTS) {
+  if (state.cauldronIngredients.length >= maxIngredients) {
     return false;
   }
 
