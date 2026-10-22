@@ -33,7 +33,7 @@ export const DIFFICULTY_SETTINGS: Record<Difficulty, IDifficultySettings> = {
     lives: 3,
     scorePerBrew: 200,
     timeBonusPerBrew: 10,
-    reactions: 2,
+    reactions: 0,
   },
   hard: {
     label: 'Hard',

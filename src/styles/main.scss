@@ -777,6 +777,45 @@ h6 {
     color: $ingredient-name;
   }
 
+  &__description {
+    display: flex;
+    align-items: start;
+    flex-direction: column;
+  }
+
+  &__properties {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 4px;
+  }
+
+  &__temperature,
+  &__density,
+  &__magic,
+  &__stock {
+    padding: 2px 4px;
+    font-family: $font-title;
+    font-size: $fz-small;
+  }
+
+  &__temperature {
+    color: $stat-temp;
+  }
+
+  &__density {
+    color: $stat-density;
+  }
+
+  &__magic {
+    color: $stat-magic;
+  }
+
+  &__stock {
+    padding: 2px 10px;
+    color: $stat-stock;
+  }
+
   &__tooltip {
     position: fixed;
     z-index: 10000;
