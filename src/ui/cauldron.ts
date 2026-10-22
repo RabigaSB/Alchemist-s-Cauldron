@@ -321,7 +321,7 @@ export function createCauldron(): HTMLElement {
   const recipeTitle = createElement('h3', 'cauldron__recipe');
   recipePanel.append(recipeText, recipeTitle);
   const recipeIcon = createElement('img', 'cauldron__recipe-icon');
-  recipeIcon.src = '/assets/icons/hand-sparkles-solid-full.svg';
+  recipeIcon.src = 'assets/icons/hand-sparkles-solid-full.svg';
   recipeIcon.alt = 'icon';
   recipePanel.appendChild(recipeIcon);
   const recipeRanges = createElement('div', 'cauldron__recipe-ranges');
