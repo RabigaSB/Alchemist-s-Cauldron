@@ -350,15 +350,11 @@ export function createCauldron(): HTMLElement {
   brewButton.addEventListener('click', brew);
   actions.appendChild(brewButton);
 
-  const clearButton = createElement('button', 'cauldron__clear', 'Clear cauldron');
-  clearButton.type = 'button';
-  clearButton.disabled = true;
-  clearButton.addEventListener('click', () => {
-    state.cauldronIngredients.length = 0;
-    renderCauldron();
-    finishIfIngredientsExhausted();
-  });
-  actions.appendChild(clearButton);
+  const pourOutButton = createElement('button', 'cauldron__pour-out', 'Pour Out');
+  pourOutButton.type = 'button';
+  pourOutButton.disabled = true;
+  pourOutButton.addEventListener('click', pourOut);
+  actions.appendChild(pourOutButton);
   bottomPanel.appendChild(actions);
 
   const resultMessage = createElement('p', 'cauldron__result');
@@ -548,7 +544,7 @@ export function createCauldron(): HTMLElement {
       state.activeRecipe,
       DIFFICULTY_SETTINGS[state.difficulty].tolerance,
     );
-    state.cauldronIngredients = [];
+    clearCauldron();
 
     if (successful) {
       const settings = DIFFICULTY_SETTINGS[state.difficulty];
@@ -574,6 +570,29 @@ export function createCauldron(): HTMLElement {
     }
 
     finishIfIngredientsExhausted();
+  }
+
+  function pourOut(): void {
+    if (!updateTimer() || state.cauldronIngredients.length === 0 || state.endTime === null) {
+      return;
+    }
+
+    state.endTime -= 10_000;
+    state.timeLeft = getRemainingSeconds(state.endTime);
+    clearCauldron();
+    resultMessage.textContent = 'You poured out the mixture. 10 seconds lost.';
+    renderCauldron();
+
+    if (state.timeLeft === 0) {
+      endGame('time');
+      return;
+    }
+
+    finishIfIngredientsExhausted();
+  }
+
+  function clearCauldron(): void {
+    state.cauldronIngredients.length = 0;
   }
 
   function handleIngredientDragOver(event: DragEvent): void {
@@ -651,7 +670,7 @@ export function createCauldron(): HTMLElement {
         state.lives = Math.max(0, state.lives - reaction.livesLost);
       }
       if (reaction.clearsCauldron) {
-        state.cauldronIngredients.length = 0;
+        clearCauldron();
       }
     }
 
@@ -896,7 +915,7 @@ export function createCauldron(): HTMLElement {
       ),
     );
     brewButton.disabled = state.status !== 'playing' || state.cauldronIngredients.length === 0;
-    clearButton.disabled = state.status !== 'playing' || state.cauldronIngredients.length === 0;
+    pourOutButton.disabled = state.status !== 'playing' || state.cauldronIngredients.length === 0;
     pauseButton.disabled = state.status !== 'playing';
     shelf.render();
     saveCurrentGame();
