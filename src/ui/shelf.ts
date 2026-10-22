@@ -1,6 +1,5 @@
 import { INGREDIENTS } from '../data/ingredients';
 import type { IIngredient } from '../data/ingredients';
-import { addIngredient } from '../logic/add-ingredient';
 import type { IGameState } from '../state/game-state';
 
 export interface IShelfView {
@@ -10,7 +9,7 @@ export interface IShelfView {
 
 export function createShelf(
   state: IGameState,
-  onIngredientAdded: () => void,
+  onIngredientAdded: (ingredient: IIngredient) => void,
   getShelfSize: () => number,
   getMaxIngredients: () => number,
 ): IShelfView {
@@ -42,7 +41,7 @@ export function createShelf(
 function createIngredientCard(
   ingredient: IIngredient,
   state: IGameState,
-  onIngredientAdded: () => void,
+  onIngredientAdded: (ingredient: IIngredient) => void,
   maxIngredients: number,
 ): HTMLButtonElement {
   const card = document.createElement('button');
@@ -127,9 +126,7 @@ function createIngredientCard(
   card.addEventListener('blur', hideTooltip);
 
   card.addEventListener('click', () => {
-    if (addIngredient(state, ingredient, maxIngredients)) {
-      onIngredientAdded();
-    }
+    onIngredientAdded(ingredient);
   });
 
   card.addEventListener('dragstart', (event: DragEvent) => {

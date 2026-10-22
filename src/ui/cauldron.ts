@@ -1,9 +1,11 @@
 import { INGREDIENTS } from '../data/ingredients';
+import type { IIngredient } from '../data/ingredients';
 import { DIFFICULTY_SETTINGS } from '../data/difficulty';
 import type { IDifficultySettings } from '../data/difficulty';
 import type { IRecipeRange } from '../data/recipes';
 import type { Difficulty } from '../data/recipes';
 import { pickRandomRecipe } from '../data/recipes';
+import { calculateReactionValues, getReactionsForDifficulty } from '../data/reactions';
 import { addIngredient } from '../logic/add-ingredient';
 import { isBrewSuccessful } from '../logic/brew-check';
 import { calculateCauldron } from '../logic/calculate-cauldron';
@@ -295,7 +297,7 @@ export function createCauldron(): HTMLElement {
 
   const shelf = createShelf(
     state,
-    renderCauldron,
+    handleIngredientAdded,
     () => DIFFICULTY_SETTINGS[state.difficulty].ingredientsOnShelf,
     () => DIFFICULTY_SETTINGS[state.difficulty].maxCauldronIngredients,
   );
@@ -537,7 +539,10 @@ export function createCauldron(): HTMLElement {
       return;
     }
 
-    const values = calculateCauldron(state.cauldronIngredients);
+    const values = calculateReactionValues(
+      state.cauldronIngredients,
+      getReactionsForDifficulty(state.difficulty),
+    );
     const successful = isBrewSuccessful(
       values,
       state.activeRecipe,
@@ -614,10 +619,57 @@ export function createCauldron(): HTMLElement {
       return;
     }
 
-    const maxIngredients = DIFFICULTY_SETTINGS[state.difficulty].maxCauldronIngredients;
-    if (addIngredient(state, ingredient, maxIngredients)) {
-      renderCauldron();
+    handleIngredientAdded(ingredient);
+  }
+
+  function handleIngredientAdded(ingredient: IIngredient): void {
+    if (!updateTimer()) {
+      return;
     }
+
+    const beforeIngredients = [...state.cauldronIngredients];
+    const maxIngredients = DIFFICULTY_SETTINGS[state.difficulty].maxCauldronIngredients;
+    if (!addIngredient(state, ingredient, maxIngredients)) {
+      return;
+    }
+
+    const reactions = getReactionsForDifficulty(state.difficulty);
+    const beforeValues = calculateCauldron(beforeIngredients);
+    const afterValues = calculateCauldron(state.cauldronIngredients);
+    const firedReactions = reactions.filter(
+      (reaction) =>
+        !reaction.isActive(beforeIngredients, beforeValues) &&
+        reaction.isActive(state.cauldronIngredients, afterValues),
+    );
+
+    for (const reaction of firedReactions) {
+      if (reaction.timePenaltySeconds && state.endTime !== null) {
+        state.endTime -= reaction.timePenaltySeconds * 1000;
+        state.timeLeft = getRemainingSeconds(state.endTime);
+      }
+      if (reaction.livesLost) {
+        state.lives = Math.max(0, state.lives - reaction.livesLost);
+      }
+      if (reaction.clearsCauldron) {
+        state.cauldronIngredients.length = 0;
+      }
+    }
+
+    if (firedReactions.length > 0) {
+      resultMessage.textContent = `Reaction: ${firedReactions.map((reaction) => reaction.name).join(', ')}!`;
+    }
+
+    renderCauldron();
+
+    if (state.timeLeft === 0) {
+      endGame('time');
+      return;
+    }
+    if (state.lives === 0) {
+      endGame('lives');
+      return;
+    }
+    finishIfIngredientsExhausted();
   }
 
   function updateTimer(): boolean {
@@ -811,7 +863,10 @@ export function createCauldron(): HTMLElement {
 
   function renderCauldron(): void {
     const recipe = state.activeRecipe;
-    const values = calculateCauldron(state.cauldronIngredients);
+    const values = calculateReactionValues(
+      state.cauldronIngredients,
+      getReactionsForDifficulty(state.difficulty),
+    );
     updateTimerDisplay();
 
     if (recipe) {
