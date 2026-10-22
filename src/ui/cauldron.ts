@@ -305,6 +305,11 @@ export function createCauldron(): HTMLElement {
 
   const cauldronSvg = createSvgBubble();
   cauldronSvg.classList.add('cauldron__drop-target');
+  const floatingIngredients = createElement('div', 'cauldron__ingredient-layer');
+  floatingIngredients.setAttribute('aria-hidden', 'true');
+  cauldronSvg.appendChild(floatingIngredients);
+  cauldronSvg.addEventListener('animationend', handleCauldronAnimationEnd);
+  game.addEventListener('animationend', handleGameAnimationEnd);
   cauldronSvg.addEventListener('dragover', handleIngredientDragOver);
   cauldronSvg.addEventListener('dragleave', handleIngredientDragLeave);
   cauldronSvg.addEventListener('drop', handleIngredientDrop);
@@ -544,6 +549,7 @@ export function createCauldron(): HTMLElement {
       state.activeRecipe,
       DIFFICULTY_SETTINGS[state.difficulty].tolerance,
     );
+    triggerBrewFeedback(successful);
     clearCauldron();
 
     if (successful) {
@@ -593,6 +599,39 @@ export function createCauldron(): HTMLElement {
 
   function clearCauldron(): void {
     state.cauldronIngredients.length = 0;
+  }
+
+  function triggerBrewFeedback(successful: boolean): void {
+    const cauldronClass = successful
+      ? 'cauldron__drop-target--success'
+      : 'cauldron__drop-target--failure';
+
+    cauldronSvg.classList.remove(
+      'cauldron__drop-target--success',
+      'cauldron__drop-target--failure',
+    );
+    game.classList.remove('cauldron__game--failure');
+    void cauldronSvg.offsetWidth;
+    cauldronSvg.classList.add(cauldronClass);
+
+    if (!successful) {
+      game.classList.add('cauldron__game--failure');
+    }
+  }
+
+  function handleCauldronAnimationEnd(event: AnimationEvent): void {
+    if (event.animationName === 'cauldron-brew-success') {
+      cauldronSvg.classList.remove('cauldron__drop-target--success');
+    }
+    if (event.animationName === 'cauldron-explosion') {
+      cauldronSvg.classList.remove('cauldron__drop-target--failure');
+    }
+  }
+
+  function handleGameAnimationEnd(event: AnimationEvent): void {
+    if (event.animationName === 'cauldron-screen-shake') {
+      game.classList.remove('cauldron__game--failure');
+    }
   }
 
   function handleIngredientDragOver(event: DragEvent): void {
@@ -913,6 +952,15 @@ export function createCauldron(): HTMLElement {
       ...state.cauldronIngredients.map((ingredient) =>
         createElement('li', 'cauldron__ingredient', ingredient.name),
       ),
+    );
+    floatingIngredients.replaceChildren(
+      ...state.cauldronIngredients.map((ingredient, index) => {
+        const icon = createElement('img', 'cauldron__ingredient-icon');
+        icon.src = ingredient.icon;
+        icon.alt = '';
+        icon.style.setProperty('--ingredient-index', `${index}`);
+        return icon;
+      }),
     );
     brewButton.disabled = state.status !== 'playing' || state.cauldronIngredients.length === 0;
     pourOutButton.disabled = state.status !== 'playing' || state.cauldronIngredients.length === 0;
