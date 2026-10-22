@@ -113,10 +113,15 @@ h6 {
     font-family: $font-title;
     font-size: 1.5rem;
 
-    &:hover {
+    &:hover:not(:disabled) {
       background: linear-gradient(180deg, #2e7d1f 0%, #1a3c0b 100%);
       box-shadow: 0 0 30px $gothic-green-glow;
       font-size: 1.6rem;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
 
     &::before {
