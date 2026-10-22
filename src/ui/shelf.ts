@@ -52,6 +52,7 @@ function createIngredientCard(
   const stockAmount = state.shelfStock[ingredient.id] ?? 0;
   const cauldronIsFull = state.cauldronIngredients.length >= maxIngredients;
   card.disabled = state.status !== 'playing' || stockAmount <= 0 || cauldronIsFull;
+  card.draggable = !card.disabled;
 
   if (stockAmount > 0) {
     const icon = document.createElement('img');
@@ -67,6 +68,21 @@ function createIngredientCard(
     if (addIngredient(state, ingredient, maxIngredients)) {
       onIngredientAdded();
     }
+  });
+
+  card.addEventListener('dragstart', (event: DragEvent) => {
+    if (
+      state.status !== 'playing' ||
+      state.cauldronIngredients.length >= maxIngredients ||
+      (state.shelfStock[ingredient.id] ?? 0) <= 0 ||
+      event.dataTransfer === null
+    ) {
+      event.preventDefault();
+      return;
+    }
+
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('application/x-alchemist-ingredient', ingredient.id);
   });
 
   const description = document.createElement('div');

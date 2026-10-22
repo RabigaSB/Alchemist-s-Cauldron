@@ -169,6 +169,18 @@ h6 {
     }
   }
 
+  &__drop-target {
+    border-radius: 16px;
+    transition:
+      filter 180ms ease,
+      transform 180ms ease;
+
+    &--active {
+      filter: drop-shadow(0 0 14px $gothic-green);
+      transform: scale(1.04);
+    }
+  }
+
   &__bottom-panel {
     width: 100%;
   }
