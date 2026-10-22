@@ -733,6 +733,7 @@ h6 {
 }
 
 .ingredient-card {
+  position: relative;
   display: flex;
   align-items: center;
   width: 100%;
@@ -766,11 +767,7 @@ h6 {
     filter: invert(84%) sepia(93%) saturate(6556%) hue-rotate(310deg) brightness(87%) contrast(105%);
   }
 
-  &__name,
-  &__temperature,
-  &__density,
-  &__magic,
-  &__stock {
+  &__name {
     font-size: $fz-small;
     font-family: $font-title;
     padding: 2px 4px;
@@ -780,20 +777,29 @@ h6 {
     color: $ingredient-name;
   }
 
-  &__temperature {
-    color: $stat-temp;
-  }
+  &__tooltip {
+    position: fixed;
+    z-index: 10000;
+    width: max-content;
+    max-width: min(320px, calc(100vw - 24px));
+    box-sizing: border-box;
+    padding: 8px 12px;
+    border: 1px solid $gothic-gold;
+    border-radius: 6px;
+    color: $body-text-color;
+    background-color: $dark-wood;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.8);
+    font-size: $fz-small;
+    line-height: 1.5;
+    text-align: left;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease;
 
-  &__density {
-    color: $stat-density;
-  }
-
-  &__magic {
-    color: $stat-magic;
-  }
-
-  &__stock {
-    color: $stat-stock;
-    padding: 2px 10px;
+    &--visible {
+      visibility: visible;
+      opacity: 1;
+    }
   }
 }
