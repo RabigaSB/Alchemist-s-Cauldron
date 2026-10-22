@@ -139,6 +139,7 @@ export function createCauldron(): HTMLElement {
     'Brew checks all three values using the selected difficulty tolerance.',
     'A successful brew earns points and time. A failed brew costs a life.',
     'Pause to stop the timer. The game ends when time, lives, or ingredients run out.',
+    'During play, press B to Brew, O to Pour Out, or Escape to pause. Activate the focused Resume button with Enter or Space to continue.',
   ].forEach((rule) => helpRules.appendChild(createElement('li', undefined, rule)));
   helpPanel.appendChild(helpRules);
   const closeHelpButton = createElement('button', 'cauldron__menu-button', 'Close');
@@ -375,6 +376,7 @@ export function createCauldron(): HTMLElement {
   updateMenuSummary();
   updateContinueButton();
   document.addEventListener('visibilitychange', handleVisibilityChange);
+  document.addEventListener('keydown', handleGameKeyDown);
 
   function startGame(): void {
     stopTimer();
@@ -517,6 +519,36 @@ export function createCauldron(): HTMLElement {
   function handleVisibilityChange(): void {
     if (document.hidden && state.status === 'playing') {
       pauseGame();
+    }
+  }
+
+  function handleGameKeyDown(event: KeyboardEvent): void {
+    if (
+      state.status !== 'playing' ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      isTextEntryTarget(event.target)
+    ) {
+      return;
+    }
+
+    switch (event.key.toLowerCase()) {
+      case 'escape': {
+        event.preventDefault();
+        pauseGame();
+        break;
+      }
+      case 'b': {
+        event.preventDefault();
+        brew();
+        break;
+      }
+      case 'o': {
+        event.preventDefault();
+        pourOut();
+        break;
+      }
     }
   }
 
@@ -984,6 +1016,17 @@ function getGameOverMessage(reason: NonNullable<IGameState['gameOverReason']>): 
       return 'Out of ingredients.';
     }
   }
+}
+
+function isTextEntryTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return (
+    target.isContentEditable ||
+    target.closest('input, textarea, select, [contenteditable="true"], [role="textbox"]') !== null
+  );
 }
 
 function createRangeLabel(label: string, range: IRecipeRange): HTMLElement {
