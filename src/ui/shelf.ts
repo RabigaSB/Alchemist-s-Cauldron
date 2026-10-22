@@ -1,6 +1,5 @@
 import { INGREDIENTS } from '../data/ingredients';
 import type { IIngredient } from '../data/ingredients';
-import { addIngredient } from '../logic/add-ingredient';
 import type { IGameState } from '../state/game-state';
 
 export interface IShelfView {
@@ -10,7 +9,7 @@ export interface IShelfView {
 
 export function createShelf(
   state: IGameState,
-  onIngredientAdded: () => void,
+  onIngredientAdded: (ingredient: IIngredient) => void,
   getShelfSize: () => number,
   getMaxIngredients: () => number,
 ): IShelfView {
@@ -42,7 +41,7 @@ export function createShelf(
 function createIngredientCard(
   ingredient: IIngredient,
   state: IGameState,
-  onIngredientAdded: () => void,
+  onIngredientAdded: (ingredient: IIngredient) => void,
   maxIngredients: number,
 ): HTMLButtonElement {
   const card = document.createElement('button');
@@ -52,22 +51,18 @@ function createIngredientCard(
   const stockAmount = state.shelfStock[ingredient.id] ?? 0;
   const cauldronIsFull = state.cauldronIngredients.length >= maxIngredients;
   card.disabled = state.status !== 'playing' || stockAmount <= 0 || cauldronIsFull;
+  card.draggable = !card.disabled;
+  card.setAttribute('aria-label', `${ingredient.name}, ${stockAmount} in stock`);
 
-  if (stockAmount > 0) {
-    const icon = document.createElement('img');
-    icon.className = 'ingredient-card__icon';
-    icon.src = ingredient.icon;
-    icon.alt = '';
-    card.appendChild(icon);
-  } else {
+  const icon = document.createElement('img');
+  icon.className = 'ingredient-card__icon';
+  icon.src = ingredient.icon;
+  icon.alt = '';
+  card.appendChild(icon);
+
+  if (stockAmount <= 0) {
     card.classList.add('ingredient-card--empty');
   }
-
-  card.addEventListener('click', () => {
-    if (addIngredient(state, ingredient, maxIngredients)) {
-      onIngredientAdded();
-    }
-  });
 
   const description = document.createElement('div');
   description.className = 'ingredient-card__description';
@@ -78,29 +73,106 @@ function createIngredientCard(
   name.textContent = ingredient.name;
   description.appendChild(name);
 
-  const properties = document.createElement('div');
-  properties.className = 'ingredient-card__properties';
-  description.appendChild(properties);
+  if (state.difficulty === 'hard') {
+    const tooltip = document.createElement('div');
+    tooltip.className = 'ingredient-card__tooltip';
+    tooltip.id = `ingredient-tooltip-${ingredient.id}`;
+    tooltip.setAttribute('role', 'tooltip');
+    tooltip.textContent = [
+      `Temperature: ${formatIngredientValue(ingredient.temperature)}`,
+      `Density: ${formatIngredientValue(ingredient.density)}`,
+      `Magic Power: ${formatIngredientValue(ingredient.magicPower)}`,
+    ].join(' · ');
+    card.setAttribute('aria-describedby', tooltip.id);
+    card.appendChild(tooltip);
 
-  const temperature = document.createElement('span');
-  temperature.className = 'ingredient-card__temperature';
-  temperature.textContent = `T${ingredient.temperature}`;
-  properties.appendChild(temperature);
+    function showTooltip(): void {
+      if (state.status !== 'playing') {
+        return;
+      }
 
-  const density = document.createElement('span');
-  density.className = 'ingredient-card__density';
-  density.textContent = `D${ingredient.density}`;
-  properties.appendChild(density);
+      const cardBounds = card.getBoundingClientRect();
+      const tooltipBounds = tooltip.getBoundingClientRect();
+      const openLeft = cardBounds.right + tooltipBounds.width > window.innerWidth;
+      const openUp = cardBounds.bottom + tooltipBounds.height > window.innerHeight;
+      const preferredLeft = openLeft ? cardBounds.left - tooltipBounds.width : cardBounds.left;
+      const preferredTop = openUp
+        ? cardBounds.top - tooltipBounds.height - 6
+        : cardBounds.bottom + 6;
+      const left = Math.max(
+        12,
+        Math.min(preferredLeft, window.innerWidth - tooltipBounds.width - 12),
+      );
+      const top = Math.max(
+        12,
+        Math.min(preferredTop, window.innerHeight - tooltipBounds.height - 12),
+      );
 
-  const magic = document.createElement('span');
-  magic.className = 'ingredient-card__magic';
-  magic.textContent = `MP${ingredient.magicPower}`;
-  properties.appendChild(magic);
+      tooltip.classList.toggle('tooltip--left', openLeft);
+      tooltip.classList.toggle('tooltip--up', openUp);
+      tooltip.style.left = `${left}px`;
+      tooltip.style.top = `${top}px`;
+      tooltip.classList.add('ingredient-card__tooltip--visible');
+    }
 
-  const stock = document.createElement('span');
-  stock.className = 'ingredient-card__stock';
-  stock.textContent = `${stockAmount}`;
-  properties.appendChild(stock);
+    function hideTooltip(): void {
+      tooltip.classList.remove('ingredient-card__tooltip--visible');
+    }
+
+    card.addEventListener('pointerenter', showTooltip);
+    card.addEventListener('pointerleave', () => {
+      if (!card.matches(':focus')) {
+        hideTooltip();
+      }
+    });
+    card.addEventListener('focus', showTooltip);
+    card.addEventListener('blur', hideTooltip);
+  } else {
+    const properties = document.createElement('div');
+    properties.className = 'ingredient-card__properties';
+    description.appendChild(properties);
+
+    for (const [className, value] of [
+      ['temperature', `T${ingredient.temperature}`],
+      ['density', `D${ingredient.density}`],
+      ['magic', `MP${ingredient.magicPower}`],
+      ['stock', `${stockAmount}`],
+    ] as const) {
+      const property = document.createElement('span');
+      property.className = `ingredient-card__${className}`;
+      property.textContent = value;
+      properties.appendChild(property);
+    }
+  }
+
+  card.addEventListener('click', () => {
+    onIngredientAdded(ingredient);
+  });
+
+  card.addEventListener('dragstart', (event: DragEvent) => {
+    if (
+      state.status !== 'playing' ||
+      state.cauldronIngredients.length >= maxIngredients ||
+      (state.shelfStock[ingredient.id] ?? 0) <= 0 ||
+      event.dataTransfer === null
+    ) {
+      event.preventDefault();
+      return;
+    }
+
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('application/x-alchemist-ingredient', ingredient.id);
+  });
 
   return card;
+}
+
+function formatIngredientValue(value: number): string {
+  if (value > 0) {
+    return `+${value}`;
+  }
+  if (value < 0) {
+    return `−${Math.abs(value)}`;
+  }
+  return '0';
 }

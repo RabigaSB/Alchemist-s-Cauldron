@@ -1,9 +1,12 @@
 import { INGREDIENTS } from '../data/ingredients';
+import type { IIngredient } from '../data/ingredients';
 import { DIFFICULTY_SETTINGS } from '../data/difficulty';
 import type { IDifficultySettings } from '../data/difficulty';
 import type { IRecipeRange } from '../data/recipes';
 import type { Difficulty } from '../data/recipes';
 import { pickRandomRecipe } from '../data/recipes';
+import { calculateReactionValues, getReactionsForDifficulty } from '../data/reactions';
+import { addIngredient } from '../logic/add-ingredient';
 import { isBrewSuccessful } from '../logic/brew-check';
 import { calculateCauldron } from '../logic/calculate-cauldron';
 import { createStock } from '../logic/stock';
@@ -136,6 +139,7 @@ export function createCauldron(): HTMLElement {
     'Brew checks all three values using the selected difficulty tolerance.',
     'A successful brew earns points and time. A failed brew costs a life.',
     'Pause to stop the timer. The game ends when time, lives, or ingredients run out.',
+    'During play, press B to Brew, O to Pour Out, or Escape to pause. Activate the focused Resume button with Enter or Space to continue.',
   ].forEach((rule) => helpRules.appendChild(createElement('li', undefined, rule)));
   helpPanel.appendChild(helpRules);
   const closeHelpButton = createElement('button', 'cauldron__menu-button', 'Close');
@@ -294,13 +298,22 @@ export function createCauldron(): HTMLElement {
 
   const shelf = createShelf(
     state,
-    renderCauldron,
+    handleIngredientAdded,
     () => DIFFICULTY_SETTINGS[state.difficulty].ingredientsOnShelf,
     () => DIFFICULTY_SETTINGS[state.difficulty].maxCauldronIngredients,
   );
   middlePanel.appendChild(shelf.element);
 
   const cauldronSvg = createSvgBubble();
+  cauldronSvg.classList.add('cauldron__drop-target');
+  const floatingIngredients = createElement('div', 'cauldron__ingredient-layer');
+  floatingIngredients.setAttribute('aria-hidden', 'true');
+  cauldronSvg.appendChild(floatingIngredients);
+  cauldronSvg.addEventListener('animationend', handleCauldronAnimationEnd);
+  game.addEventListener('animationend', handleGameAnimationEnd);
+  cauldronSvg.addEventListener('dragover', handleIngredientDragOver);
+  cauldronSvg.addEventListener('dragleave', handleIngredientDragLeave);
+  cauldronSvg.addEventListener('drop', handleIngredientDrop);
   middlePanel.appendChild(cauldronSvg);
 
   const recipePanel = createElement('section', 'cauldron__recipe-panel');
@@ -308,7 +321,7 @@ export function createCauldron(): HTMLElement {
   const recipeTitle = createElement('h3', 'cauldron__recipe');
   recipePanel.append(recipeText, recipeTitle);
   const recipeIcon = createElement('img', 'cauldron__recipe-icon');
-  recipeIcon.src = '/assets/icons/hand-sparkles-solid-full.svg';
+  recipeIcon.src = 'assets/icons/hand-sparkles-solid-full.svg';
   recipeIcon.alt = 'icon';
   recipePanel.appendChild(recipeIcon);
   const recipeRanges = createElement('div', 'cauldron__recipe-ranges');
@@ -343,15 +356,11 @@ export function createCauldron(): HTMLElement {
   brewButton.addEventListener('click', brew);
   actions.appendChild(brewButton);
 
-  const clearButton = createElement('button', 'cauldron__clear', 'Clear cauldron');
-  clearButton.type = 'button';
-  clearButton.disabled = true;
-  clearButton.addEventListener('click', () => {
-    state.cauldronIngredients.length = 0;
-    renderCauldron();
-    finishIfIngredientsExhausted();
-  });
-  actions.appendChild(clearButton);
+  const pourOutButton = createElement('button', 'cauldron__pour-out', 'Pour Out');
+  pourOutButton.type = 'button';
+  pourOutButton.disabled = true;
+  pourOutButton.addEventListener('click', pourOut);
+  actions.appendChild(pourOutButton);
   bottomPanel.appendChild(actions);
 
   const resultMessage = createElement('p', 'cauldron__result');
@@ -367,6 +376,7 @@ export function createCauldron(): HTMLElement {
   updateMenuSummary();
   updateContinueButton();
   document.addEventListener('visibilitychange', handleVisibilityChange);
+  document.addEventListener('keydown', handleGameKeyDown);
 
   function startGame(): void {
     stopTimer();
@@ -512,6 +522,36 @@ export function createCauldron(): HTMLElement {
     }
   }
 
+  function handleGameKeyDown(event: KeyboardEvent): void {
+    if (
+      state.status !== 'playing' ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      isTextEntryTarget(event.target)
+    ) {
+      return;
+    }
+
+    switch (event.key.toLowerCase()) {
+      case 'escape': {
+        event.preventDefault();
+        pauseGame();
+        break;
+      }
+      case 'b': {
+        event.preventDefault();
+        brew();
+        break;
+      }
+      case 'o': {
+        event.preventDefault();
+        pourOut();
+        break;
+      }
+    }
+  }
+
   function stopTimer(): void {
     if (timerInterval !== undefined) {
       clearInterval(timerInterval);
@@ -532,13 +572,17 @@ export function createCauldron(): HTMLElement {
       return;
     }
 
-    const values = calculateCauldron(state.cauldronIngredients);
+    const values = calculateReactionValues(
+      state.cauldronIngredients,
+      getReactionsForDifficulty(state.difficulty),
+    );
     const successful = isBrewSuccessful(
       values,
       state.activeRecipe,
       DIFFICULTY_SETTINGS[state.difficulty].tolerance,
     );
-    state.cauldronIngredients = [];
+    triggerBrewFeedback(successful);
+    clearCauldron();
 
     if (successful) {
       const settings = DIFFICULTY_SETTINGS[state.difficulty];
@@ -563,6 +607,158 @@ export function createCauldron(): HTMLElement {
       return;
     }
 
+    finishIfIngredientsExhausted();
+  }
+
+  function pourOut(): void {
+    if (!updateTimer() || state.cauldronIngredients.length === 0 || state.endTime === null) {
+      return;
+    }
+
+    state.endTime -= 10_000;
+    state.timeLeft = getRemainingSeconds(state.endTime);
+    clearCauldron();
+    resultMessage.textContent = 'You poured out the mixture. 10 seconds lost.';
+    renderCauldron();
+
+    if (state.timeLeft === 0) {
+      endGame('time');
+      return;
+    }
+
+    finishIfIngredientsExhausted();
+  }
+
+  function clearCauldron(): void {
+    state.cauldronIngredients.length = 0;
+  }
+
+  function triggerBrewFeedback(successful: boolean): void {
+    const cauldronClass = successful
+      ? 'cauldron__drop-target--success'
+      : 'cauldron__drop-target--failure';
+
+    cauldronSvg.classList.remove(
+      'cauldron__drop-target--success',
+      'cauldron__drop-target--failure',
+    );
+    game.classList.remove('cauldron__game--failure');
+    void cauldronSvg.offsetWidth;
+    cauldronSvg.classList.add(cauldronClass);
+
+    if (!successful) {
+      game.classList.add('cauldron__game--failure');
+    }
+  }
+
+  function handleCauldronAnimationEnd(event: AnimationEvent): void {
+    if (event.animationName === 'cauldron-brew-success') {
+      cauldronSvg.classList.remove('cauldron__drop-target--success');
+    }
+    if (event.animationName === 'cauldron-explosion') {
+      cauldronSvg.classList.remove('cauldron__drop-target--failure');
+    }
+  }
+
+  function handleGameAnimationEnd(event: AnimationEvent): void {
+    if (event.animationName === 'cauldron-screen-shake') {
+      game.classList.remove('cauldron__game--failure');
+    }
+  }
+
+  function handleIngredientDragOver(event: DragEvent): void {
+    const maxIngredients = DIFFICULTY_SETTINGS[state.difficulty].maxCauldronIngredients;
+    const hasIngredientPayload =
+      event.dataTransfer?.types.includes('application/x-alchemist-ingredient') ?? false;
+
+    if (
+      state.status !== 'playing' ||
+      state.cauldronIngredients.length >= maxIngredients ||
+      !hasIngredientPayload
+    ) {
+      cauldronSvg.classList.remove('cauldron__drop-target--active');
+      return;
+    }
+
+    event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'move';
+    }
+    cauldronSvg.classList.add('cauldron__drop-target--active');
+  }
+
+  function handleIngredientDragLeave(event: DragEvent): void {
+    if (event.relatedTarget instanceof Node && cauldronSvg.contains(event.relatedTarget)) {
+      return;
+    }
+
+    cauldronSvg.classList.remove('cauldron__drop-target--active');
+  }
+
+  function handleIngredientDrop(event: DragEvent): void {
+    event.preventDefault();
+    cauldronSvg.classList.remove('cauldron__drop-target--active');
+
+    if (state.status !== 'playing' || event.dataTransfer === null) {
+      return;
+    }
+
+    const ingredientId = event.dataTransfer.getData('application/x-alchemist-ingredient');
+    const ingredient = INGREDIENTS.find((item) => item.id === ingredientId);
+    if (ingredient === undefined) {
+      return;
+    }
+
+    handleIngredientAdded(ingredient);
+  }
+
+  function handleIngredientAdded(ingredient: IIngredient): void {
+    if (!updateTimer()) {
+      return;
+    }
+
+    const beforeIngredients = [...state.cauldronIngredients];
+    const maxIngredients = DIFFICULTY_SETTINGS[state.difficulty].maxCauldronIngredients;
+    if (!addIngredient(state, ingredient, maxIngredients)) {
+      return;
+    }
+
+    const reactions = getReactionsForDifficulty(state.difficulty);
+    const beforeValues = calculateCauldron(beforeIngredients);
+    const afterValues = calculateCauldron(state.cauldronIngredients);
+    const firedReactions = reactions.filter(
+      (reaction) =>
+        !reaction.isActive(beforeIngredients, beforeValues) &&
+        reaction.isActive(state.cauldronIngredients, afterValues),
+    );
+
+    for (const reaction of firedReactions) {
+      if (reaction.timePenaltySeconds && state.endTime !== null) {
+        state.endTime -= reaction.timePenaltySeconds * 1000;
+        state.timeLeft = getRemainingSeconds(state.endTime);
+      }
+      if (reaction.livesLost) {
+        state.lives = Math.max(0, state.lives - reaction.livesLost);
+      }
+      if (reaction.clearsCauldron) {
+        clearCauldron();
+      }
+    }
+
+    if (firedReactions.length > 0) {
+      resultMessage.textContent = `Reaction: ${firedReactions.map((reaction) => reaction.name).join(', ')}!`;
+    }
+
+    renderCauldron();
+
+    if (state.timeLeft === 0) {
+      endGame('time');
+      return;
+    }
+    if (state.lives === 0) {
+      endGame('lives');
+      return;
+    }
     finishIfIngredientsExhausted();
   }
 
@@ -757,7 +953,10 @@ export function createCauldron(): HTMLElement {
 
   function renderCauldron(): void {
     const recipe = state.activeRecipe;
-    const values = calculateCauldron(state.cauldronIngredients);
+    const values = calculateReactionValues(
+      state.cauldronIngredients,
+      getReactionsForDifficulty(state.difficulty),
+    );
     updateTimerDisplay();
 
     if (recipe) {
@@ -786,8 +985,17 @@ export function createCauldron(): HTMLElement {
         createElement('li', 'cauldron__ingredient', ingredient.name),
       ),
     );
+    floatingIngredients.replaceChildren(
+      ...state.cauldronIngredients.map((ingredient, index) => {
+        const icon = createElement('img', 'cauldron__ingredient-icon');
+        icon.src = ingredient.icon;
+        icon.alt = '';
+        icon.style.setProperty('--ingredient-index', `${index}`);
+        return icon;
+      }),
+    );
     brewButton.disabled = state.status !== 'playing' || state.cauldronIngredients.length === 0;
-    clearButton.disabled = state.status !== 'playing' || state.cauldronIngredients.length === 0;
+    pourOutButton.disabled = state.status !== 'playing' || state.cauldronIngredients.length === 0;
     pauseButton.disabled = state.status !== 'playing';
     shelf.render();
     saveCurrentGame();
@@ -808,6 +1016,17 @@ function getGameOverMessage(reason: NonNullable<IGameState['gameOverReason']>): 
       return 'Out of ingredients.';
     }
   }
+}
+
+function isTextEntryTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return (
+    target.isContentEditable ||
+    target.closest('input, textarea, select, [contenteditable="true"], [role="textbox"]') !== null
+  );
 }
 
 function createRangeLabel(label: string, range: IRecipeRange): HTMLElement {
