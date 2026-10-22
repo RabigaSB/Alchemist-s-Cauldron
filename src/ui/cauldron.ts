@@ -8,6 +8,8 @@ import { isBrewSuccessful } from '../logic/brew-check';
 import { calculateCauldron } from '../logic/calculate-cauldron';
 import { createStock } from '../logic/stock';
 import { formatTime, getRemainingSeconds, hasIngredientsRemaining } from '../logic/timer';
+import { clearSave, loadGame, saveGame } from '../storage/save';
+import type { IGameSave } from '../storage/save';
 import {
   addLeaderboardEntry,
   clearLeaderboard,
@@ -54,11 +56,19 @@ export function createCauldron(): HTMLElement {
   startScreen.appendChild(menuSummary);
   const selectedDifficulty = createElement('p', 'cauldron__selected-difficulty');
   startScreen.appendChild(selectedDifficulty);
+  const saveStatus = createElement('p', 'cauldron__save-status');
+  saveStatus.setAttribute('aria-live', 'polite');
+  startScreen.appendChild(saveStatus);
   const menuActions = createElement('div', 'cauldron__menu-actions');
   const startButton = createElement('button', 'cauldron__start', 'Start Game');
   startButton.type = 'button';
   startButton.addEventListener('click', startGame);
   menuActions.appendChild(startButton);
+  const continueButton = createElement('button', 'cauldron__menu-button', 'Continue Game');
+  continueButton.type = 'button';
+  continueButton.hidden = true;
+  continueButton.addEventListener('click', continueGame);
+  menuActions.appendChild(continueButton);
   const settingsButton = createElement('button', 'cauldron__menu-button', 'Settings');
   settingsButton.type = 'button';
   menuActions.appendChild(settingsButton);
@@ -355,6 +365,7 @@ export function createCauldron(): HTMLElement {
   let leaderboardReturnFocus: HTMLElement | null = null;
 
   updateMenuSummary();
+  updateContinueButton();
   document.addEventListener('visibilitychange', handleVisibilityChange);
 
   function startGame(): void {
@@ -386,6 +397,50 @@ export function createCauldron(): HTMLElement {
     renderCauldron();
     updateTimer();
     timerInterval = setInterval(updateTimer, 250);
+    saveStatus.textContent = '';
+  }
+
+  function continueGame(): void {
+    const result = loadGame();
+    if (!result.success) {
+      continueButton.hidden = true;
+      saveStatus.textContent = result.error;
+      return;
+    }
+
+    if (result.save === null) {
+      continueButton.hidden = true;
+      saveStatus.textContent = 'No unfinished game is available to continue.';
+      return;
+    }
+
+    restoreGame(result.save);
+  }
+
+  function restoreGame(save: IGameSave): void {
+    state.difficulty = save.difficulty;
+    state.score = save.score;
+    state.timeLeft = save.timeLeft;
+    state.lives = save.lives;
+    state.activeRecipe = save.activeRecipe;
+    state.cauldronIngredients = save.cauldronIngredients;
+    state.shelfStock = save.shelfStock;
+    state.status = 'paused';
+    state.endTime = null;
+    state.gameOverReason = null;
+    pausedTimeMs = save.timeLeft * 1000;
+    timer.setAttribute('aria-valuemax', `${DIFFICULTY_SETTINGS[state.difficulty].startingTime}`);
+    startScreen.hidden = true;
+    gameOverScreen.hidden = true;
+    settingsPanel.hidden = true;
+    helpPanel.hidden = true;
+    game.hidden = false;
+    pauseDialog.hidden = false;
+    resultMessage.textContent = 'Game restored. Resume when you are ready.';
+    updateMenuSummary();
+    renderCauldron();
+    saveCurrentGame();
+    resumeButton.focus();
   }
 
   function pauseGame(): void {
@@ -400,6 +455,7 @@ export function createCauldron(): HTMLElement {
     stopTimer();
     pauseDialog.hidden = false;
     renderCauldron();
+    saveCurrentGame();
     resumeButton.focus();
   }
 
@@ -421,11 +477,13 @@ export function createCauldron(): HTMLElement {
     renderCauldron();
     updateTimer();
     timerInterval = setInterval(updateTimer, 250);
+    saveCurrentGame();
     pauseButton.focus();
   }
 
   function exitToMenu(): void {
     stopTimer();
+    const clearResult = clearSave();
     state.status = 'menu';
     state.activeRecipe = null;
     state.cauldronIngredients = [];
@@ -438,11 +496,13 @@ export function createCauldron(): HTMLElement {
     pausedTimeMs = 0;
     startMessage.textContent = 'Ready to brew a potion?';
     startButton.textContent = 'Start Game';
+    saveStatus.textContent = clearResult.success ? '' : clearResult.error;
     pauseDialog.hidden = true;
     gameOverScreen.hidden = true;
     game.hidden = true;
     startScreen.hidden = false;
     renderCauldron();
+    updateContinueButton();
     startButton.focus();
   }
 
@@ -511,8 +571,12 @@ export function createCauldron(): HTMLElement {
       return false;
     }
 
+    const previousTimeLeft = state.timeLeft;
     state.timeLeft = getRemainingSeconds(state.endTime);
     updateTimerDisplay();
+    if (state.timeLeft !== previousTimeLeft) {
+      saveCurrentGame();
+    }
 
     if (state.timeLeft === 0) {
       endGame('time');
@@ -548,6 +612,7 @@ export function createCauldron(): HTMLElement {
 
     state.status = 'game-over';
     state.gameOverReason = reason;
+    const clearResult = clearSave();
     if (timerInterval !== undefined) {
       clearInterval(timerInterval);
       timerInterval = undefined;
@@ -556,16 +621,17 @@ export function createCauldron(): HTMLElement {
     finalScore.textContent = `Final score: ${state.score}`;
     nameError.textContent = '';
     nameInput.value = '';
-    scoreSaveStatus.textContent = '';
+    const storageErrors: string[] = clearResult.success ? [] : [clearResult.error];
     const leaderboard = readLeaderboard(state.difficulty);
     if (leaderboard.success && qualifiesForLeaderboard(state.score, leaderboard.entries)) {
       nameForm.hidden = false;
     } else {
       nameForm.hidden = true;
       if (!leaderboard.success) {
-        scoreSaveStatus.textContent = leaderboard.error;
+        storageErrors.push(leaderboard.error);
       }
     }
+    scoreSaveStatus.textContent = storageErrors.join(' ');
     game.hidden = true;
     startScreen.hidden = true;
     gameOverScreen.hidden = false;
@@ -592,6 +658,26 @@ export function createCauldron(): HTMLElement {
 
     nameForm.hidden = true;
     scoreSaveStatus.textContent = 'Your score has been saved.';
+  }
+
+  function saveCurrentGame(): void {
+    if (state.status !== 'playing' && state.status !== 'paused') {
+      return;
+    }
+
+    const result = saveGame(state);
+    if (!result.success) {
+      resultMessage.textContent = result.error;
+    }
+    updateContinueButton();
+  }
+
+  function updateContinueButton(): void {
+    const result = loadGame();
+    continueButton.hidden = !result.success || result.save === null;
+    if (!result.success) {
+      saveStatus.textContent = result.error;
+    }
   }
 
   function openLeaderboard(event?: Event): void {
@@ -704,6 +790,7 @@ export function createCauldron(): HTMLElement {
     clearButton.disabled = state.status !== 'playing' || state.cauldronIngredients.length === 0;
     pauseButton.disabled = state.status !== 'playing';
     shelf.render();
+    saveCurrentGame();
   }
 
   return cauldron;
