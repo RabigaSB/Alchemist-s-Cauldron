@@ -19,7 +19,7 @@ export function createParameterBar(
   bar.appendChild(heading);
 
   const name = document.createElement('h3');
-  name.className = 'parameter-bar__name';
+  name.className = `parameter-bar__name parameter-bar__name-${label.toLowerCase().replace(/\s+/g, '-')}`;
   name.textContent = label;
   heading.appendChild(name);
 
