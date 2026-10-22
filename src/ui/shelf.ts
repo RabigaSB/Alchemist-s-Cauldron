@@ -1,16 +1,19 @@
 import { INGREDIENTS } from '../data/ingredients';
 import type { IIngredient } from '../data/ingredients';
-import { addIngredient, MAX_CAULDRON_INGREDIENTS } from '../logic/add-ingredient';
+import { addIngredient } from '../logic/add-ingredient';
 import type { IGameState } from '../state/game-state';
-
-const SHELF_INGREDIENTS = INGREDIENTS.slice(0, 6);
 
 export interface IShelfView {
   element: HTMLElement;
   render: () => void;
 }
 
-export function createShelf(state: IGameState, onIngredientAdded: () => void): IShelfView {
+export function createShelf(
+  state: IGameState,
+  onIngredientAdded: () => void,
+  getShelfSize: () => number,
+  getMaxIngredients: () => number,
+): IShelfView {
   const shelf = document.createElement('section');
   shelf.className = 'shelf';
 
@@ -25,8 +28,8 @@ export function createShelf(state: IGameState, onIngredientAdded: () => void): I
 
   function render(): void {
     ingredientsContainer.replaceChildren(
-      ...SHELF_INGREDIENTS.map((ingredient) =>
-        createIngredientCard(ingredient, state, onIngredientAdded),
+      ...INGREDIENTS.slice(0, getShelfSize()).map((ingredient) =>
+        createIngredientCard(ingredient, state, onIngredientAdded, getMaxIngredients()),
       ),
     );
   }
@@ -40,13 +43,14 @@ function createIngredientCard(
   ingredient: IIngredient,
   state: IGameState,
   onIngredientAdded: () => void,
+  maxIngredients: number,
 ): HTMLButtonElement {
   const card = document.createElement('button');
   card.type = 'button';
   card.className = 'ingredient-card';
 
   const stockAmount = state.shelfStock[ingredient.id] ?? 0;
-  const cauldronIsFull = state.cauldronIngredients.length >= MAX_CAULDRON_INGREDIENTS;
+  const cauldronIsFull = state.cauldronIngredients.length >= maxIngredients;
   card.disabled = state.status !== 'playing' || stockAmount <= 0 || cauldronIsFull;
 
   if (stockAmount > 0) {
@@ -60,7 +64,7 @@ function createIngredientCard(
   }
 
   card.addEventListener('click', () => {
-    if (addIngredient(state, ingredient)) {
+    if (addIngredient(state, ingredient, maxIngredients)) {
       onIngredientAdded();
     }
   });

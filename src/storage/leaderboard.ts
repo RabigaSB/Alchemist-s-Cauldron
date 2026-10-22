@@ -1,3 +1,5 @@
+import type { Difficulty } from '../data/recipes';
+
 const LEADERBOARD_KEY = 'alchemists-cauldron-leaderboard';
 const LEADERBOARD_LIMIT = 10;
 const PLAYER_NAME_PATTERN = /^[A-Za-z0-9 _-]{2,15}$/;
@@ -6,6 +8,7 @@ export interface ILeaderboardEntry {
   name: string;
   score: number;
   timestamp: number;
+  difficulty: Difficulty;
 }
 
 export type LeaderboardResult =
@@ -27,9 +30,9 @@ export function qualifiesForLeaderboard(
   return lowestRankedEntry !== undefined && score > lowestRankedEntry.score;
 }
 
-export function readLeaderboard(): LeaderboardResult {
+export function readLeaderboard(difficulty: Difficulty): LeaderboardResult {
   try {
-    const storedEntries = window.localStorage.getItem(LEADERBOARD_KEY);
+    const storedEntries = window.localStorage.getItem(getLeaderboardKey(difficulty));
     if (storedEntries === null) {
       return { success: true, entries: [] };
     }
@@ -39,7 +42,8 @@ export function readLeaderboard(): LeaderboardResult {
       return { success: false, error: 'Saved leaderboard data is invalid.' };
     }
 
-    return { success: true, entries: sortLeaderboard(parsed).slice(0, LEADERBOARD_LIMIT) };
+    const entries = parsed.map((entry) => ({ ...entry, difficulty }));
+    return { success: true, entries: sortLeaderboard(entries).slice(0, LEADERBOARD_LIMIT) };
   } catch {
     return { success: false, error: 'Leaderboard storage is unavailable.' };
   }
@@ -48,13 +52,14 @@ export function readLeaderboard(): LeaderboardResult {
 export function addLeaderboardEntry(
   name: string,
   score: number,
+  difficulty: Difficulty,
   timestamp = Date.now(),
 ): LeaderboardResult {
   if (!isValidPlayerName(name)) {
     return { success: false, error: 'Use 2–15 letters, digits, spaces, underscores, or hyphens.' };
   }
 
-  const current = readLeaderboard();
+  const current = readLeaderboard(difficulty);
   if (!current.success) {
     return current;
   }
@@ -63,22 +68,22 @@ export function addLeaderboardEntry(
     return { success: true, entries: current.entries };
   }
 
-  const entries = sortLeaderboard([...current.entries, { name, score, timestamp }]).slice(
-    0,
-    LEADERBOARD_LIMIT,
-  );
+  const entries = sortLeaderboard([
+    ...current.entries,
+    { name, score, timestamp, difficulty },
+  ]).slice(0, LEADERBOARD_LIMIT);
 
   try {
-    window.localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(entries));
+    window.localStorage.setItem(getLeaderboardKey(difficulty), JSON.stringify(entries));
     return { success: true, entries };
   } catch {
     return { success: false, error: 'Could not save the leaderboard in this browser.' };
   }
 }
 
-export function clearLeaderboard(): LeaderboardResult {
+export function clearLeaderboard(difficulty: Difficulty): LeaderboardResult {
   try {
-    window.localStorage.removeItem(LEADERBOARD_KEY);
+    window.localStorage.removeItem(getLeaderboardKey(difficulty));
     return { success: true, entries: [] };
   } catch {
     return { success: false, error: 'Could not clear the leaderboard in this browser.' };
@@ -123,7 +128,15 @@ function isLeaderboardEntryArray(value: unknown): value is ILeaderboardEntry[] {
         Number.isFinite(entry.score) &&
         'timestamp' in entry &&
         typeof entry.timestamp === 'number' &&
-        Number.isFinite(entry.timestamp),
+        Number.isFinite(entry.timestamp) &&
+        (!('difficulty' in entry) ||
+          entry.difficulty === 'easy' ||
+          entry.difficulty === 'medium' ||
+          entry.difficulty === 'hard'),
     )
   );
+}
+
+function getLeaderboardKey(difficulty: Difficulty): string {
+  return difficulty === 'medium' ? LEADERBOARD_KEY : `${LEADERBOARD_KEY}-${difficulty}`;
 }

@@ -1,7 +1,8 @@
 import type { IIngredient } from '../data/ingredients';
-import type { IRecipe } from '../data/recipes';
+import type { Difficulty, IRecipe } from '../data/recipes';
 
 export interface IGameState {
+  difficulty: Difficulty;
   cauldronIngredients: IIngredient[];
   shelfStock: Record<string, number>;
   activeRecipe: IRecipe | null;
